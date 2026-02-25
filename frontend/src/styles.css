@@ -532,15 +532,18 @@ button.ghost {
 
 .capture-launch {
   display: grid;
-  justify-items: center;
-  gap: 0.55rem;
+  justify-items: stretch;
+  gap: 0.62rem;
   text-align: center;
   padding: 0.9rem 0.2rem 0.35rem;
+  width: min(26rem, 100%);
+  margin: 0 auto;
 }
 
 .capture-launch-copy {
   margin: 0;
   max-width: 30rem;
+  font-size: 0.84rem;
 }
 
 .capture-input-label {
@@ -548,14 +551,43 @@ button.ghost {
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  min-width: 170px;
+  width: 100%;
+  min-height: 50px;
+  border-radius: 14px;
+  padding: 0.82rem 1rem;
+  border: 1px solid transparent;
+  font-weight: 800;
+  letter-spacing: 0.01em;
   text-align: center;
   overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.capture-input-label.primary {
+  background: linear-gradient(114deg, var(--brand) 0%, var(--brand-2) 75%);
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(18, 64, 81, 0.24);
+}
+
+.capture-input-label.ghost {
+  background: #fff;
+  color: var(--ink);
+  border-color: rgba(180, 201, 204, 0.85);
+  box-shadow:
+    0 6px 14px rgba(14, 39, 49, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.capture-input-label:hover {
+  transform: translateY(-1px);
 }
 
 .capture-input-label.disabled {
   opacity: 0.65;
   cursor: not-allowed;
+  transform: none;
 }
 
 .capture-input-label.disabled .capture-file-overlay {
@@ -563,7 +595,7 @@ button.ghost {
 }
 
 .capture-secondary {
-  min-width: 170px;
+  min-height: 48px;
 }
 
 .capture-file-overlay {
