@@ -116,7 +116,33 @@ try {
     $router->dispatch($method, $path);
 } catch (HttpException $exception) {
     Response::json(['error' => $exception->getMessage()], $exception->getStatusCode());
+} catch (PDOException $exception) {
+    error_log(sprintf('[OnLedge][PDO] %s | SQLSTATE %s', $exception->getMessage(), (string) $exception->getCode()));
+
+    $sqlState = (string) $exception->getCode();
+    $error = match ($sqlState) {
+        '42P01' => 'Database schema is missing. Run migrations before using the API.',
+        '3D000' => 'Database does not exist for configured credentials.',
+        '28000', '28P01' => 'Database authentication failed. Check DB user/password.',
+        default => (str_starts_with($sqlState, '08')
+            ? 'Database connection failed. Check host/port/SSL and reachability.'
+            : 'Database error during request. Check server logs for details.'),
+    };
+
+    Response::json(['error' => $error], 500);
+} catch (RuntimeException $exception) {
+    error_log(sprintf('[OnLedge][Runtime] %s', $exception->getMessage()));
+
+    $message = $exception->getMessage();
+    if (str_contains($message, 'Missing /api/config/config.php')) {
+        Response::json(['error' => 'Server misconfiguration: /api/config/config.php is missing.'], 500);
+        return;
+    }
+
+    Response::json(['error' => 'Server runtime error. Check server logs for details.'], 500);
 } catch (Throwable $exception) {
+    error_log(sprintf('[OnLedge][Fatal] %s', $exception->getMessage()));
+
     $isProduction = ($config['app']['env'] ?? 'production') === 'production';
     $payload = ['error' => 'Unexpected server error'];
     if (!$isProduction) {
