@@ -4,7 +4,7 @@ Options -Indexes
   RewriteEngine On
 
   # Block direct access to sensitive folders.
-  RewriteRule ^(config|migrations)(/.*)?$ - [F,L]
+  RewriteRule ^(config|migrations|src)(/.*)?$ - [F,L]
 
   # Route API requests through index.php.
   RewriteCond %{REQUEST_FILENAME} !-f

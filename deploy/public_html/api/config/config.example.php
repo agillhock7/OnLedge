@@ -7,6 +7,7 @@ return [
         'env' => 'production', // APP_ENV
         'url' => 'https://onledge.gops.app', // APP_URL
         'api_base_url' => 'https://onledge.gops.app/api', // API_BASE_URL
+        'debug_errors' => false, // APP_DEBUG_ERRORS (keep false in production)
     ],
     'database' => [
         'host' => '127.0.0.1',

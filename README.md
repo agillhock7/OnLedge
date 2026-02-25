@@ -93,6 +93,7 @@ cp api/config/config.example.php api/config/config.php
 2. Edit `api/config/config.php` and fill real values:
 
 - `app.env`, `app.url`, `app.api_base_url`
+- `app.debug_errors` (`false` in production)
 - `database.host`, `port`, `dbname`, `user`, `password`, `sslmode`
 - `uploads.dir` (absolute path recommended outside web root)
 - `session_cookie.secure`, `httponly`, `samesite`
@@ -199,8 +200,13 @@ Also ensure upload directory exists and is writable by PHP:
 - Passwords hashed with `password_hash()`
 - Session auth via secure, `HttpOnly` cookies (`SameSite` configurable)
 - API endpoints scope data by `user_id`
-- `/api/.htaccess` denies direct access to `config` and `migrations`
+- API responses include no-store cache headers and hardening headers (`nosniff`, `DENY` frame options, strict API CSP)
+- Mutating API requests (`POST`/`PUT`/`DELETE`) require `X-OnLedge-Client: web` header (added by frontend API client)
+- `/api/.htaccess` denies direct access to `config`, `migrations`, and `src`
 - `/uploads/.htaccess` prevents directory listing and PHP execution
+- Keep `app.debug_errors = false` in production to avoid exposing diagnostics publicly
+
+For disclosure/process guidance, see [SECURITY.md](/home/pascal/projects/OnLedge/SECURITY.md).
 
 ## API Surface (MVP)
 
@@ -229,6 +235,10 @@ Rules / Search / Export:
 - `DELETE /api/rules/{id}`
 - `GET /api/search?q=...`
 - `GET /api/export/csv?from=YYYY-MM-DD&to=YYYY-MM-DD`
+
+Request guard:
+
+- `POST`/`PUT`/`DELETE` requests must include `X-OnLedge-Client: web`
 
 ## Compatibility Reference (Documented)
 

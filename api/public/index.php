@@ -11,6 +11,7 @@ use App\Controllers\SearchController;
 use App\DB\Database;
 use App\Helpers\HttpException;
 use App\Helpers\Response;
+use App\Helpers\Security;
 use App\Router\Router;
 
 $bootstrapCandidates = [
@@ -35,10 +36,16 @@ if ($bootstrapPath === null) {
 
 require_once $bootstrapPath;
 
+Security::applyApiHeaders();
+
 $config = ['app' => ['env' => 'production']];
+$debugErrors = false;
 
 try {
     $config = onledge_load_config();
+    $debugErrors = ($config['app']['env'] ?? 'production') !== 'production'
+        || (bool) ($config['app']['debug_errors'] ?? false);
+
     $db = Database::connection($config['database']);
     $auth = new SessionAuth();
 
@@ -113,11 +120,18 @@ try {
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
+    Security::enforceMutatingRequestGuard($method);
     $router->dispatch($method, $path);
 } catch (HttpException $exception) {
     Response::json(['error' => $exception->getMessage()], $exception->getStatusCode());
 } catch (PDOException $exception) {
-    error_log(sprintf('[OnLedge][PDO] %s | SQLSTATE %s', $exception->getMessage(), (string) $exception->getCode()));
+    $errorId = bin2hex(random_bytes(4));
+    error_log(sprintf('[OnLedge][PDO][%s] %s | SQLSTATE %s', $errorId, $exception->getMessage(), (string) $exception->getCode()));
+
+    if (!$debugErrors) {
+        Response::json(['error' => 'Database error during request.', 'error_id' => $errorId], 500);
+        return;
+    }
 
     $sqlState = (string) $exception->getCode();
     $rawMessage = strtolower($exception->getMessage());
@@ -139,23 +153,29 @@ try {
         $error = 'Database permission denied for table. Grant SELECT/INSERT/UPDATE/DELETE to app user.';
     }
 
-    Response::json(['error' => $error], 500);
+    Response::json(['error' => $error, 'error_id' => $errorId], 500);
 } catch (RuntimeException $exception) {
-    error_log(sprintf('[OnLedge][Runtime] %s', $exception->getMessage()));
+    $errorId = bin2hex(random_bytes(4));
+    error_log(sprintf('[OnLedge][Runtime][%s] %s', $errorId, $exception->getMessage()));
 
-    $message = $exception->getMessage();
-    if (str_contains($message, 'Missing /api/config/config.php')) {
-        Response::json(['error' => 'Server misconfiguration: /api/config/config.php is missing.'], 500);
+    if (!$debugErrors) {
+        Response::json(['error' => 'Server runtime error.', 'error_id' => $errorId], 500);
         return;
     }
 
-    Response::json(['error' => 'Server runtime error. Check server logs for details.'], 500);
-} catch (Throwable $exception) {
-    error_log(sprintf('[OnLedge][Fatal] %s', $exception->getMessage()));
+    $message = $exception->getMessage();
+    if (str_contains($message, 'Missing /api/config/config.php')) {
+        Response::json(['error' => 'Server misconfiguration: /api/config/config.php is missing.', 'error_id' => $errorId], 500);
+        return;
+    }
 
-    $isProduction = ($config['app']['env'] ?? 'production') === 'production';
-    $payload = ['error' => 'Unexpected server error'];
-    if (!$isProduction) {
+    Response::json(['error' => 'Server runtime error. Check server logs for details.', 'error_id' => $errorId], 500);
+} catch (Throwable $exception) {
+    $errorId = bin2hex(random_bytes(4));
+    error_log(sprintf('[OnLedge][Fatal][%s] %s', $errorId, $exception->getMessage()));
+
+    $payload = ['error' => 'Unexpected server error', 'error_id' => $errorId];
+    if ($debugErrors) {
         $payload['debug'] = $exception->getMessage();
     }
     Response::json($payload, 500);

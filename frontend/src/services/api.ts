@@ -14,7 +14,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 type ApiMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 async function request<T>(path: string, method: ApiMethod, body?: BodyInit | Record<string, unknown>, isForm = false): Promise<T> {
-  const headers: HeadersInit = {};
+  const headers: HeadersInit = {
+    'X-OnLedge-Client': 'web'
+  };
   let payload: BodyInit | undefined;
 
   if (body instanceof FormData) {
