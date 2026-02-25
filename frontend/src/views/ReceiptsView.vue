@@ -1,6 +1,6 @@
 <template>
   <section class="page">
-    <div class="inline" style="justify-content: space-between; align-items: flex-end">
+    <div class="inline receipts-header" style="justify-content: space-between; align-items: flex-end">
       <div>
         <h1>Receipts</h1>
         <p class="muted">Search, inspect, and manage receipts.</p>
@@ -15,7 +15,7 @@
 
     <p v-if="receipts.error" class="error">{{ receipts.error }}</p>
 
-    <div class="card" style="margin-top: 1rem; overflow-x: auto">
+    <div class="card receipts-table-wrap" style="margin-top: 1rem; overflow-x: auto">
       <table class="table">
         <thead>
           <tr>
@@ -41,6 +41,25 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="receipts-mobile-list">
+      <router-link
+        v-for="item in filtered"
+        :key="item.id"
+        :to="`/app/receipts/${item.id}`"
+        class="receipt-mobile-card"
+      >
+        <div class="receipt-mobile-top">
+          <strong>{{ item.merchant || 'Unknown Merchant' }}</strong>
+          <strong>${{ Number(item.total ?? 0).toFixed(2) }}</strong>
+        </div>
+        <div class="receipt-mobile-meta">
+          <span>Date: {{ item.purchased_at || '-' }}</span>
+          <span>Category: {{ item.category || '-' }}</span>
+        </div>
+        <span v-if="item.offline" class="muted">Offline draft</span>
+      </router-link>
     </div>
   </section>
 </template>
