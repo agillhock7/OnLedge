@@ -120,14 +120,24 @@ try {
     error_log(sprintf('[OnLedge][PDO] %s | SQLSTATE %s', $exception->getMessage(), (string) $exception->getCode()));
 
     $sqlState = (string) $exception->getCode();
+    $rawMessage = strtolower($exception->getMessage());
     $error = match ($sqlState) {
         '42P01' => 'Database schema is missing. Run migrations before using the API.',
         '3D000' => 'Database does not exist for configured credentials.',
         '28000', '28P01' => 'Database authentication failed. Check DB user/password.',
+        '42501' => 'Database permission denied. Grant table and sequence privileges to the app user.',
         default => (str_starts_with($sqlState, '08')
             ? 'Database connection failed. Check host/port/SSL and reachability.'
             : 'Database error during request. Check server logs for details.'),
     };
+
+    if (str_contains($rawMessage, 'could not find driver')) {
+        $error = 'PHP PDO PostgreSQL driver is missing on server (pdo_pgsql not enabled).';
+    } elseif (str_contains($rawMessage, 'permission denied for sequence')) {
+        $error = 'Database permission denied for sequence. Grant USAGE/SELECT on sequence(s) to app user.';
+    } elseif (str_contains($rawMessage, 'permission denied for relation')) {
+        $error = 'Database permission denied for table. Grant SELECT/INSERT/UPDATE/DELETE to app user.';
+    }
 
     Response::json(['error' => $error], 500);
 } catch (RuntimeException $exception) {
