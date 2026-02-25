@@ -129,6 +129,27 @@ final class UserNotificationService
         return false;
     }
 
+    /** @param array<string, mixed> $user */
+    public function sendTestEmail(array $user): bool
+    {
+        $userId = (int) ($user['id'] ?? 0);
+        $email = trim((string) ($user['email'] ?? ''));
+        if ($userId <= 0 || $email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        $settings = $this->getPreferences($userId);
+        $summary = $this->buildWeeklySummary($userId);
+
+        return $this->mailer->send($email, 'test_notification', [
+            'user' => $user,
+            'settings' => $settings,
+            'summary' => $summary,
+            'app_url' => $this->appUrl(),
+            'generated_at' => (new DateTimeImmutable())->format(DATE_ATOM),
+        ]);
+    }
+
     /** @return array<string, mixed> */
     private function buildWeeklySummary(int $userId): array
     {

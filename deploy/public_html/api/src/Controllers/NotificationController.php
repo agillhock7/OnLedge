@@ -48,6 +48,22 @@ final class NotificationController
         Response::json(['item' => $settings]);
     }
 
+    public function sendTestEmail(): void
+    {
+        $this->ensureSchema();
+        $user = $this->currentUser();
+
+        $sent = $this->service->sendTestEmail($user);
+        if (!$sent) {
+            throw new HttpException('Unable to send test email. Confirm SMTP/sendmail settings are valid.', 503);
+        }
+
+        Response::json([
+            'ok' => true,
+            'message' => 'Test email sent successfully.',
+        ]);
+    }
+
     /** @return array<string, mixed> */
     private function currentUser(): array
     {
@@ -62,4 +78,3 @@ final class NotificationController
         }
     }
 }
-

@@ -234,6 +234,7 @@ button.ghost {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 100vh;
+  align-items: start;
 }
 
 .skip-link {
@@ -255,7 +256,12 @@ button.ghost {
 }
 
 .sidebar {
-  position: relative;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background:
     radial-gradient(20rem 16rem at 100% 0%, rgba(255, 205, 137, 0.2), transparent 70%),
     linear-gradient(180deg, #0f2d38 0%, #173f4d 100%);
@@ -333,6 +339,7 @@ button.ghost {
 
 .content {
   padding: 1.6rem;
+  min-width: 0;
 }
 
 .table {

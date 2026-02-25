@@ -93,9 +93,14 @@
           <button class="primary" type="button" :disabled="emailPrefsSaving" @click="saveEmailPreferences">
             {{ emailPrefsSaving ? 'Saving...' : 'Save Email Preferences' }}
           </button>
+          <button class="secondary" type="button" :disabled="testEmailSending" @click="sendTestEmail">
+            {{ testEmailSending ? 'Sending...' : 'Send Test Email' }}
+          </button>
         </div>
         <p v-if="emailPrefsNotice" class="success" style="margin: 0">{{ emailPrefsNotice }}</p>
         <p v-if="emailPrefsError" class="error" style="margin: 0">{{ emailPrefsError }}</p>
+        <p v-if="testEmailNotice" class="success" style="margin: 0">{{ testEmailNotice }}</p>
+        <p v-if="testEmailError" class="error" style="margin: 0">{{ testEmailError }}</p>
       </article>
     </section>
 
@@ -489,6 +494,9 @@ const preferenceNotice = ref('');
 const emailPrefsNotice = ref('');
 const emailPrefsError = ref('');
 const emailPrefsSaving = ref(false);
+const testEmailSending = ref(false);
+const testEmailNotice = ref('');
+const testEmailError = ref('');
 
 const supportScope = ref<'mine' | 'admin'>('mine');
 const adminTicketFilters = reactive({
@@ -689,6 +697,21 @@ async function saveEmailPreferences() {
     emailPrefsError.value = error instanceof Error ? error.message : 'Unable to update email preferences';
   } finally {
     emailPrefsSaving.value = false;
+  }
+}
+
+async function sendTestEmail() {
+  testEmailSending.value = true;
+  testEmailError.value = '';
+  testEmailNotice.value = '';
+
+  try {
+    const response = await apiPost<{ ok: boolean; message?: string }>('/notifications/test-email');
+    testEmailNotice.value = response.message || 'Test email sent.';
+  } catch (error) {
+    testEmailError.value = error instanceof Error ? error.message : 'Unable to send test email';
+  } finally {
+    testEmailSending.value = false;
   }
 }
 

@@ -148,6 +148,9 @@ try {
     $router->put('/notifications/preferences', function () use ($notificationController): void {
         $notificationController->updatePreferences();
     });
+    $router->post('/notifications/test-email', function () use ($notificationController): void {
+        $notificationController->sendTestEmail();
+    });
 
     $router->post('/support/tickets', function () use ($supportTicketController): void {
         $supportTicketController->create();
