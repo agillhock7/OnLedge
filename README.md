@@ -73,10 +73,10 @@ Deployment model:
 
 ```mermaid
 flowchart LR
-  U[Browser / PWA] -->|HTTPS /api| A[PHP API]
-  A -->|SQL| P[(PostgreSQL)]
-  B[Local Build Machine] -->|npm run build| D[deploy/public_html]
-  D -->|.cpanel.yml copy| W[/home/gopsapp1/onledge.gops.app]
+  U["Browser / PWA"] -->|"HTTPS /api"| A["PHP API"]
+  A -->|"SQL"| P[("PostgreSQL")]
+  B["Local Build Machine"] -->|"npm run build"| D["deploy/public_html"]
+  D -->|".cpanel.yml copy"| W["/home/gopsapp1/onledge.gops.app"]
 ```
 
 ## Repository Layout
