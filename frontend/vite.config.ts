@@ -16,8 +16,8 @@ export default defineConfig({
         description: 'Receipt capture, search, and export with offline support',
         start_url: '/',
         display: 'standalone',
-        background_color: '#f4efe5',
-        theme_color: '#16343f',
+        background_color: '#f4f7f5',
+        theme_color: '#0f2f3a',
         icons: [
           {
             src: '/icon.svg',

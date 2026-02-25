@@ -1,6 +1,7 @@
 <template>
   <div class="auth-shell">
     <div class="card auth-card">
+      <BrandLockup compact />
       <h1>Forgot Password</h1>
       <p class="muted">Submit your email. The backend stores reset requests for future SMTP handling.</p>
 
@@ -25,6 +26,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
+import BrandLockup from '@/components/BrandLockup.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();

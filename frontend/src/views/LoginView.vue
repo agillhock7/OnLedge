@@ -1,6 +1,7 @@
 <template>
   <div class="auth-shell">
     <div class="card auth-card">
+      <BrandLockup compact />
       <h1>Login</h1>
       <p class="muted">Use your OnLedge account to access receipts and sync data.</p>
 
@@ -34,6 +35,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import BrandLockup from '@/components/BrandLockup.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();

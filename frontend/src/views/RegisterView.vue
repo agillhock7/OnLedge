@@ -1,6 +1,7 @@
 <template>
   <div class="auth-shell">
     <div class="card auth-card">
+      <BrandLockup compact />
       <h1>Register</h1>
       <p class="muted">Create an account to keep your receipts searchable and exportable.</p>
 
@@ -30,6 +31,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import BrandLockup from '@/components/BrandLockup.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
