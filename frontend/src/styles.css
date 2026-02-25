@@ -768,6 +768,121 @@ button.ghost {
   padding: 0.9rem;
 }
 
+.settings-control-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-control-head {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.settings-control-head h1 {
+  margin: 0;
+}
+
+.settings-control-head .muted {
+  margin: 0;
+  max-width: 64ch;
+}
+
+.settings-overview-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 1rem;
+}
+
+.settings-account-card,
+.settings-preference-card,
+.settings-support-card {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.settings-account-card h3,
+.settings-preference-card h3,
+.settings-support-card h3 {
+  margin: 0;
+}
+
+.settings-account-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.settings-account-grid div {
+  border: 1px solid #d8e6e3;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.72rem 0.78rem;
+  display: grid;
+  gap: 0.32rem;
+}
+
+.settings-account-grid span {
+  color: var(--muted);
+  font-size: 0.79rem;
+}
+
+.settings-account-grid strong {
+  font-size: 0.94rem;
+}
+
+.settings-preference-grid {
+  display: grid;
+  gap: 0.78rem;
+}
+
+.settings-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.62rem;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.settings-toggle-row input[type='checkbox'],
+.settings-inline-toggle input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #226173;
+}
+
+.settings-field-wide {
+  grid-column: 1 / -1;
+}
+
+.settings-support-card p {
+  margin: 0;
+}
+
+.settings-item-meta {
+  font-size: 0.82rem;
+}
+
+.settings-admin-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.52rem;
+  min-height: 42px;
+}
+
+.settings-inline-toggle label {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 .reports-head {
   display: flex;
   align-items: flex-start;
@@ -2327,6 +2442,19 @@ button.ghost {
 
   .settings-form {
     grid-template-columns: 1fr;
+  }
+
+  .settings-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-account-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-toggle-row,
+  .settings-inline-toggle {
+    align-items: flex-start;
   }
 
   .reports-filter-grid {
