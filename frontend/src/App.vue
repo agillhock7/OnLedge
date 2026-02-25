@@ -2,9 +2,13 @@
   <OfflineBanner />
   <router-view v-slot="{ Component, route }">
     <MainLayout v-if="route.path.startsWith('/app')">
-      <component :is="Component" />
+      <transition name="page-swap" mode="out-in">
+        <component :is="Component" :key="route.fullPath" />
+      </transition>
     </MainLayout>
-    <component :is="Component" v-else />
+    <transition v-else name="page-swap" mode="out-in">
+      <component :is="Component" :key="route.fullPath" />
+    </transition>
   </router-view>
 </template>
 
