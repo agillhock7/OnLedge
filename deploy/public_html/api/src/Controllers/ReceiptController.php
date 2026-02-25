@@ -154,6 +154,80 @@ final class ReceiptController
     }
 
     /** @param array<string, string> $params */
+    public function image(array $params): void
+    {
+        $userId = $this->auth->requireUserId();
+        $id = (string) ($params['id'] ?? '');
+
+        $stmt = $this->db->prepare(
+            'SELECT file_path
+             FROM receipts
+             WHERE id = :id AND user_id = :user_id
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $id, ':user_id' => $userId]);
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            throw new HttpException('Receipt not found', 404);
+        }
+
+        $filePath = trim((string) ($row['file_path'] ?? ''));
+        if ($filePath === '') {
+            throw new HttpException('Receipt image not found', 404);
+        }
+
+        $resolvedPath = realpath($filePath);
+        if ($resolvedPath === false || !is_file($resolvedPath) || !is_readable($resolvedPath)) {
+            throw new HttpException('Receipt image not found', 404);
+        }
+
+        $uploadDir = trim((string) ($this->config['uploads']['dir'] ?? ''));
+        if ($uploadDir !== '') {
+            $resolvedUploadDir = realpath($uploadDir);
+            if ($resolvedUploadDir !== false) {
+                $prefix = rtrim($resolvedUploadDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+                if ($resolvedPath !== $resolvedUploadDir && !str_starts_with($resolvedPath, $prefix)) {
+                    throw new HttpException('Receipt image path is not allowed', 403);
+                }
+            }
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? finfo_file($finfo, $resolvedPath) : null;
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+
+        $contentType = is_string($mime) && $mime !== '' ? $mime : 'application/octet-stream';
+        $fileSize = filesize($resolvedPath);
+        $filename = basename($resolvedPath);
+
+        header('Content-Type: ' . $contentType);
+        header('Content-Disposition: inline; filename="' . str_replace('"', '', $filename) . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, max-age=3600');
+        if ($fileSize !== false) {
+            header('Content-Length: ' . (string) $fileSize);
+        }
+
+        $stream = fopen($resolvedPath, 'rb');
+        if ($stream === false) {
+            throw new HttpException('Unable to read receipt image', 500);
+        }
+
+        while (!feof($stream)) {
+            $chunk = fread($stream, 8192);
+            if ($chunk === false) {
+                break;
+            }
+            echo $chunk;
+        }
+
+        fclose($stream);
+    }
+
+    /** @param array<string, string> $params */
     public function update(array $params): void
     {
         $userId = $this->auth->requireUserId();
@@ -177,26 +251,20 @@ final class ReceiptController
             ? $this->normalizeTags($input['tags'])
             : $this->normalizeTags($existing['tags'] ?? []);
 
-        $stmt = $this->db->prepare(
-            sprintf(
-                'UPDATE receipts
-                 SET merchant = :merchant,
-                     total = :total,
-                     currency = :currency,
-                     purchased_at = :purchased_at,
-                     notes = :notes,
-                     raw_text = :raw_text,
-                     category = :category,
-                     tags = CAST(:tags AS text[])
-                 WHERE id = :id AND user_id = :user_id
-                 RETURNING %s',
-                $this->receiptColumnsSql(),
-            )
-        );
+        $setClauses = [
+            'merchant = :merchant',
+            'total = :total',
+            'currency = :currency',
+            'purchased_at = :purchased_at',
+            'notes = :notes',
+            'raw_text = :raw_text',
+            'category = :category',
+            'tags = CAST(:tags AS text[])',
+        ];
 
-        $stmt->execute([
+        $params = [
             ':merchant' => $merchant !== '' ? $merchant : null,
-            ':total' => $total !== null && $total !== '' ? (float) $total : null,
+            ':total' => $this->numericOrNull($total),
             ':currency' => $currency ?: 'USD',
             ':purchased_at' => $purchasedAt !== '' ? $purchasedAt : null,
             ':notes' => $notes !== '' ? $notes : null,
@@ -205,7 +273,86 @@ final class ReceiptController
             ':tags' => $this->toPgArray($tags),
             ':id' => $id,
             ':user_id' => $userId,
-        ]);
+        ];
+
+        if ($this->hasReceiptColumn('merchant_address')) {
+            $setClauses[] = 'merchant_address = :merchant_address';
+            $merchantAddress = array_key_exists('merchant_address', $input)
+                ? trim((string) $input['merchant_address'])
+                : trim((string) ($existing['merchant_address'] ?? ''));
+            $params[':merchant_address'] = $merchantAddress !== '' ? $merchantAddress : null;
+        }
+
+        if ($this->hasReceiptColumn('receipt_number')) {
+            $setClauses[] = 'receipt_number = :receipt_number';
+            $receiptNumber = array_key_exists('receipt_number', $input)
+                ? trim((string) $input['receipt_number'])
+                : trim((string) ($existing['receipt_number'] ?? ''));
+            $params[':receipt_number'] = $receiptNumber !== '' ? $receiptNumber : null;
+        }
+
+        if ($this->hasReceiptColumn('purchased_time')) {
+            $setClauses[] = 'purchased_time = :purchased_time';
+            $purchasedTime = array_key_exists('purchased_time', $input)
+                ? trim((string) $input['purchased_time'])
+                : trim((string) ($existing['purchased_time'] ?? ''));
+            $params[':purchased_time'] = $purchasedTime !== '' ? $purchasedTime : null;
+        }
+
+        if ($this->hasReceiptColumn('subtotal')) {
+            $setClauses[] = 'subtotal = :subtotal';
+            $subtotal = array_key_exists('subtotal', $input) ? $input['subtotal'] : ($existing['subtotal'] ?? null);
+            $params[':subtotal'] = $this->numericOrNull($subtotal);
+        }
+
+        if ($this->hasReceiptColumn('tax')) {
+            $setClauses[] = 'tax = :tax';
+            $tax = array_key_exists('tax', $input) ? $input['tax'] : ($existing['tax'] ?? null);
+            $params[':tax'] = $this->numericOrNull($tax);
+        }
+
+        if ($this->hasReceiptColumn('tip')) {
+            $setClauses[] = 'tip = :tip';
+            $tip = array_key_exists('tip', $input) ? $input['tip'] : ($existing['tip'] ?? null);
+            $params[':tip'] = $this->numericOrNull($tip);
+        }
+
+        if ($this->hasReceiptColumn('payment_method')) {
+            $setClauses[] = 'payment_method = :payment_method';
+            $paymentMethod = array_key_exists('payment_method', $input)
+                ? trim((string) $input['payment_method'])
+                : trim((string) ($existing['payment_method'] ?? ''));
+            $params[':payment_method'] = $paymentMethod !== '' ? $paymentMethod : null;
+        }
+
+        if ($this->hasReceiptColumn('payment_last4')) {
+            $setClauses[] = 'payment_last4 = :payment_last4';
+            $paymentLast4 = array_key_exists('payment_last4', $input)
+                ? trim((string) $input['payment_last4'])
+                : trim((string) ($existing['payment_last4'] ?? ''));
+            $digits = preg_replace('/\D+/', '', $paymentLast4);
+            $params[':payment_last4'] = is_string($digits) && $digits !== '' ? substr($digits, -4) : null;
+        }
+
+        if ($this->hasReceiptColumn('line_items')) {
+            $setClauses[] = 'line_items = CAST(:line_items AS jsonb)';
+            $lineItems = array_key_exists('line_items', $input)
+                ? $this->normalizeLineItems($input['line_items'])
+                : $this->normalizeLineItems($existing['line_items'] ?? []);
+            $params[':line_items'] = json_encode($lineItems, JSON_UNESCAPED_UNICODE);
+        }
+
+        $stmt = $this->db->prepare(
+            sprintf(
+                'UPDATE receipts
+                 SET %s
+                 WHERE id = :id AND user_id = :user_id
+                 RETURNING %s',
+                implode(",\n                     ", $setClauses),
+                $this->receiptColumnsSql(),
+            )
+        );
+        $stmt->execute($params);
 
         $receipt = $stmt->fetch();
         Response::json(['item' => $this->normalizeReceipt($receipt ?: [])]);

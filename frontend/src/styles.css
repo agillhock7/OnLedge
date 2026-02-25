@@ -882,6 +882,179 @@ button.ghost {
   font-size: 0.78rem;
 }
 
+.receipt-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.receipt-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.receipt-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(340px, 1.05fr);
+  gap: 1rem;
+}
+
+.receipt-image-card {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.receipt-image-frame {
+  border: 1px solid #b9cecd;
+  border-radius: 16px;
+  background: #f6fbfa;
+  min-height: 320px;
+  max-height: 75vh;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.receipt-image {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.receipt-image-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border-radius: 10px;
+  padding: 0.46rem 0.74rem;
+  border: 1px solid rgba(180, 201, 204, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.81rem;
+  font-weight: 700;
+}
+
+.receipt-key-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.7rem;
+}
+
+.receipt-key-item {
+  border: 1px solid #d5e4e2;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.65rem 0.7rem;
+  display: grid;
+  gap: 0.22rem;
+}
+
+.receipt-key-item span {
+  color: #5f7781;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.receipt-key-item strong {
+  font-size: 0.94rem;
+}
+
+.receipt-edit-form {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.receipt-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.7rem;
+}
+
+.receipt-field-wide {
+  grid-column: 1 / -1;
+}
+
+.receipt-line-items-edit {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.receipt-line-items-grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.receipt-line-edit-row {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 0.9fr 0.9fr 1fr auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.receipt-ocr-input {
+  min-height: 150px;
+}
+
+.receipt-ocr-view {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.83rem;
+  color: #1f343d;
+  background: #f6fbfa;
+  border: 1px solid #d7e5e2;
+  border-radius: 12px;
+  padding: 0.75rem;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.processing-trace-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.processing-trace-item {
+  border: 1px solid #d4e3e1;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.7rem;
+}
+
+.pill.trace-status-success {
+  background: #e5f5eb;
+  border-color: #95c8a8;
+  color: #1f6a43;
+}
+
+.pill.trace-status-failed {
+  background: #f9e9e7;
+  border-color: #daaba4;
+  color: #8f3025;
+}
+
+.pill.trace-status-skipped {
+  background: #f4eef9;
+  border-color: #c8b6dd;
+  color: #5a4576;
+}
+
+.pill.trace-status-default {
+  background: #edf4f6;
+  border-color: #bfd1d8;
+  color: #355c67;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -1077,6 +1250,23 @@ button.ghost {
 
   .settings-form {
     grid-template-columns: 1fr;
+  }
+
+  .receipt-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .receipt-line-edit-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .receipt-line-edit-row > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .receipt-image-frame {
+    min-height: 240px;
+    max-height: 62vh;
   }
 
   .capture-actions {

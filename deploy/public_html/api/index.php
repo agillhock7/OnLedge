@@ -100,6 +100,9 @@ try {
     $router->get('/receipts/{id}', function (array $params) use ($receiptController): void {
         $receiptController->show($params);
     });
+    $router->get('/receipts/{id}/image', function (array $params) use ($receiptController): void {
+        $receiptController->image($params);
+    });
     $router->put('/receipts/{id}', function (array $params) use ($receiptController): void {
         $receiptController->update($params);
     });
