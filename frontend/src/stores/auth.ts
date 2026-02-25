@@ -5,7 +5,12 @@ import { apiGet, apiPost } from '@/services/api';
 type User = {
   id: number;
   email: string;
+  role: 'user' | 'admin' | 'owner';
+  is_active: boolean;
+  is_seed: boolean;
+  disabled_at?: string | null;
   created_at: string;
+  updated_at?: string | null;
 };
 
 type AuthResponse = {
@@ -19,7 +24,9 @@ export const useAuthStore = defineStore('auth', {
     hydrated: false
   }),
   getters: {
-    isAuthenticated: (state) => state.user !== null
+    isAuthenticated: (state) => state.user !== null,
+    isAdmin: (state) => state.user?.role === 'admin' || state.user?.role === 'owner',
+    isOwner: (state) => state.user?.role === 'owner'
   },
   actions: {
     async hydrate(): Promise<void> {

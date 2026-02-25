@@ -25,6 +25,7 @@
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Database Setup](#database-setup)
+- [Admin Bootstrap](#admin-bootstrap)
 - [Build And Release Workflow](#build-and-release-workflow)
 - [cPanel Deployment Runbook](#cpanel-deployment-runbook)
 - [Public Repo Guardrails](#public-repo-guardrails)
@@ -158,10 +159,11 @@ Reference key map: `api/.env.example`
 
 ## Database Setup
 
-Run migration:
+Run migrations in order:
 
 ```bash
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/001_init.sql
+psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/002_admin_support.sql
 ```
 
 Migration includes:
@@ -170,6 +172,22 @@ Migration includes:
 - full-text search (`tsvector` + GIN index)
 - update triggers
 - extension-free UUID generation (`onledge_uuid_v4`) for shared hosts without `pgcrypto`
+- role-based users (`user`, `admin`, `owner`) and support ticket tables
+
+## Admin Bootstrap
+
+Seed an initial owner account (one-time setup):
+
+1. Generate a password hash:
+
+```bash
+php -r "echo password_hash('ChangeMe-Strong-Password', PASSWORD_DEFAULT), PHP_EOL;"
+```
+
+2. Open `api/migrations/003_seed_owner.example.sql`, replace placeholders, and run it in PostgreSQL.
+3. Login with seeded owner account.
+4. In **Settings > Admin: User Management**, create permanent admin/owner users.
+5. Disable the seed account after permanent access is verified.
 
 ## Build And Release Workflow
 
@@ -283,6 +301,19 @@ Rules / Search / Export:
 - `DELETE /api/rules/{id}`
 - `GET /api/search?q=...`
 - `GET /api/export/csv?from=YYYY-MM-DD&to=YYYY-MM-DD`
+
+Support:
+
+- `POST /api/support/tickets`
+- `GET /api/support/tickets/my`
+
+Admin:
+
+- `GET /api/admin/users`
+- `POST /api/admin/users`
+- `PUT /api/admin/users/{id}`
+- `GET /api/admin/tickets`
+- `PUT /api/admin/tickets/{id}`
 
 ## Contributing
 

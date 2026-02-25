@@ -15,6 +15,7 @@
       </nav>
       <div class="sidebar-footer">
         <p class="sidebar-user">{{ auth.user?.email || 'Signed in' }}</p>
+        <p class="sidebar-role">{{ auth.user?.role || 'user' }}</p>
         <button class="ghost" @click="logout">Logout</button>
       </div>
     </aside>

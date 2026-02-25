@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Auth\SessionAuth;
+use App\Controllers\AdminController;
 use App\Controllers\AuthController;
 use App\Controllers\ExportController;
 use App\Controllers\ReceiptController;
 use App\Controllers\RuleController;
 use App\Controllers\SearchController;
+use App\Controllers\SupportTicketController;
 use App\DB\Database;
 use App\Helpers\HttpException;
 use App\Helpers\Response;
@@ -54,6 +56,8 @@ try {
     $ruleController = new RuleController($db, $auth);
     $searchController = new SearchController($db, $auth);
     $exportController = new ExportController($db, $auth);
+    $adminController = new AdminController($db, $auth);
+    $supportTicketController = new SupportTicketController($db, $auth);
 
     $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/api/index.php')), '/');
     $router = new Router($basePath === '/' ? '' : $basePath);
@@ -115,6 +119,30 @@ try {
     });
     $router->get('/export/csv', function () use ($exportController): void {
         $exportController->csv();
+    });
+
+    $router->post('/support/tickets', function () use ($supportTicketController): void {
+        $supportTicketController->create();
+    });
+    $router->get('/support/tickets/my', function () use ($supportTicketController): void {
+        $supportTicketController->mine();
+    });
+
+    $router->get('/admin/users', function () use ($adminController): void {
+        $adminController->users();
+    });
+    $router->post('/admin/users', function () use ($adminController): void {
+        $adminController->createUser();
+    });
+    $router->put('/admin/users/{id}', function (array $params) use ($adminController): void {
+        $adminController->updateUser($params);
+    });
+
+    $router->get('/admin/tickets', function () use ($supportTicketController): void {
+        $supportTicketController->adminIndex();
+    });
+    $router->put('/admin/tickets/{id}', function (array $params) use ($supportTicketController): void {
+        $supportTicketController->adminUpdate($params);
     });
 
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');

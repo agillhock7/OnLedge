@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Auth\SessionAuth;
+use App\Helpers\Authz;
 use App\Helpers\HttpException;
 use App\Helpers\Request;
 use App\Helpers\Response;
@@ -33,7 +34,11 @@ final class AuthController
         $hash = password_hash($password, PASSWORD_DEFAULT);
 
         try {
-            $stmt = $this->db->prepare('INSERT INTO users (email, password_hash) VALUES (:email, :password_hash) RETURNING id, email, created_at');
+            $stmt = $this->db->prepare(
+                'INSERT INTO users (email, password_hash)
+                 VALUES (:email, :password_hash)
+                 RETURNING id, email, role, is_active, is_seed, created_at, updated_at, disabled_at'
+            );
             $stmt->execute([
                 ':email' => $email,
                 ':password_hash' => $hash,
@@ -49,11 +54,7 @@ final class AuthController
         $this->auth->login((int) $user['id']);
 
         Response::json([
-            'user' => [
-                'id' => (int) $user['id'],
-                'email' => (string) $user['email'],
-                'created_at' => (string) $user['created_at'],
-            ],
+            'user' => Authz::normalizeUser($user ?: []),
         ], 201);
     }
 
@@ -63,22 +64,26 @@ final class AuthController
         $email = strtolower(trim((string) ($input['email'] ?? '')));
         $password = (string) ($input['password'] ?? '');
 
-        $stmt = $this->db->prepare('SELECT id, email, password_hash, created_at FROM users WHERE email = :email LIMIT 1');
+        $stmt = $this->db->prepare(
+            'SELECT id, email, password_hash, role, is_active, is_seed, created_at, updated_at, disabled_at
+             FROM users
+             WHERE email = :email
+             LIMIT 1'
+        );
         $stmt->execute([':email' => $email]);
         $user = $stmt->fetch();
 
         if (!$user || !password_verify($password, (string) $user['password_hash'])) {
             throw new HttpException('Invalid email or password', 401);
         }
+        if (!in_array(($user['is_active'] ?? false), [true, 1, '1', 't', 'true'], true)) {
+            throw new HttpException('Account is disabled', 403);
+        }
 
         $this->auth->login((int) $user['id']);
 
         Response::json([
-            'user' => [
-                'id' => (int) $user['id'],
-                'email' => (string) $user['email'],
-                'created_at' => (string) $user['created_at'],
-            ],
+            'user' => Authz::normalizeUser($user),
         ]);
     }
 
@@ -124,20 +129,25 @@ final class AuthController
     {
         $userId = $this->auth->requireUserId();
 
-        $stmt = $this->db->prepare('SELECT id, email, created_at FROM users WHERE id = :id');
+        $stmt = $this->db->prepare(
+            'SELECT id, email, role, is_active, is_seed, created_at, updated_at, disabled_at
+             FROM users
+             WHERE id = :id'
+        );
         $stmt->execute([':id' => $userId]);
         $user = $stmt->fetch();
 
         if (!$user) {
             throw new HttpException('User not found', 404);
         }
+        $normalized = Authz::normalizeUser($user);
+        if (!$normalized['is_active']) {
+            $this->auth->logout();
+            throw new HttpException('Account is disabled', 403);
+        }
 
         Response::json([
-            'user' => [
-                'id' => (int) $user['id'],
-                'email' => (string) $user['email'],
-                'created_at' => (string) $user['created_at'],
-            ],
+            'user' => $normalized,
         ]);
     }
 }
