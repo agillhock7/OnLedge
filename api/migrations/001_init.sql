@@ -74,16 +74,16 @@ DROP TRIGGER IF EXISTS trg_receipts_updated_at ON receipts;
 CREATE TRIGGER trg_receipts_updated_at
 BEFORE UPDATE ON receipts
 FOR EACH ROW
-EXECUTE FUNCTION set_updated_at();
+EXECUTE PROCEDURE set_updated_at();
 
 DROP TRIGGER IF EXISTS trg_rules_updated_at ON rules;
 CREATE TRIGGER trg_rules_updated_at
 BEFORE UPDATE ON rules
 FOR EACH ROW
-EXECUTE FUNCTION set_updated_at();
+EXECUTE PROCEDURE set_updated_at();
 
 DROP TRIGGER IF EXISTS trg_receipts_search_vector_update ON receipts;
 CREATE TRIGGER trg_receipts_search_vector_update
 BEFORE INSERT OR UPDATE ON receipts
 FOR EACH ROW
-EXECUTE FUNCTION receipts_search_vector_update();
+EXECUTE PROCEDURE receipts_search_vector_update();
