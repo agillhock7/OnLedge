@@ -62,7 +62,7 @@ export const useReceiptsStore = defineStore('receipts', {
       }
     },
 
-    async createReceipt(input: Record<string, unknown>, file?: File | null): Promise<void> {
+    async createReceipt(input: Record<string, unknown>, file?: File | null): Promise<Receipt> {
       this.error = '';
 
       try {
@@ -86,14 +86,14 @@ export const useReceiptsStore = defineStore('receipts', {
 
           const response = await apiPost<ReceiptSingleResponse>('/receipts', form);
           this.items.unshift(response.item);
-          return;
+          return response.item;
         }
 
         if (navigator.onLine) {
           const response = await apiPost<ReceiptSingleResponse>('/receipts', input);
           this.items.unshift(response.item);
           await putLocalReceipt({ ...response.item, offline: false } as LocalReceipt);
-          return;
+          return response.item;
         }
 
         const offlineId = `offline-${crypto.randomUUID()}`;
@@ -119,6 +119,7 @@ export const useReceiptsStore = defineStore('receipts', {
           payload: input,
           createdAt: new Date().toISOString()
         });
+        return draft;
       } catch (error) {
         this.error = error instanceof Error ? error.message : 'Failed to create receipt';
         throw error;
