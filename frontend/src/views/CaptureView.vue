@@ -33,7 +33,26 @@
           playsinline
         ></video>
 
-        <img v-if="previewUrl" :src="previewUrl" alt="Captured receipt preview" class="camera-feed" />
+        <div v-if="previewUrl" class="preview-editor">
+          <img ref="previewImageEl" :src="previewUrl" alt="Captured receipt preview" class="camera-feed" />
+
+          <svg v-if="manualAdjust" class="edge-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <polygon :points="polygonPoints" />
+          </svg>
+
+          <button
+            v-if="manualAdjust"
+            v-for="(_, index) in corners"
+            :key="index"
+            class="corner-handle"
+            type="button"
+            :style="cornerStyle(index)"
+            :aria-label="`Move corner ${index + 1}`"
+            @pointerdown="startHandleDrag(index, $event)"
+          >
+            <span class="visually-hidden">Corner {{ index + 1 }}</span>
+          </button>
+        </div>
 
         <div v-if="!previewUrl && cameraSupported" class="camera-overlay" aria-hidden="true">
           <div class="camera-guide">
@@ -50,6 +69,21 @@
         </div>
 
         <canvas ref="canvasEl" style="display: none"></canvas>
+      </div>
+
+      <div v-if="previewUrl" class="inline" style="margin-top: 0.8rem">
+        <label class="scan-toggle">
+          <input type="checkbox" v-model="manualAdjust" :disabled="submitting" />
+          Manual edge adjust
+        </label>
+        <button
+          type="button"
+          class="ghost"
+          :disabled="submitting || processingCapture"
+          @click="applyAutoEdges"
+        >
+          Auto Detect Edges
+        </button>
       </div>
 
       <div v-if="longReceiptMode && !previewUrl && segmentPreviews.length > 0" class="segment-strip">
@@ -144,11 +178,19 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 
 import { useReceiptsStore } from '@/stores/receipts';
-import { processCapturedFrame, stitchReceiptSegments } from '@/utils/receiptScan';
+import {
+  correctReceiptPerspective,
+  defaultReceiptCorners,
+  type NormalizedCorner,
+  processCapturedFrame,
+  stitchReceiptSegments,
+  suggestReceiptCorners
+} from '@/utils/receiptScan';
 
 const receipts = useReceiptsStore();
 
 const videoEl = ref<HTMLVideoElement | null>(null);
+const previewImageEl = ref<HTMLImageElement | null>(null);
 const canvasEl = ref<HTMLCanvasElement | null>(null);
 const stream = ref<MediaStream | null>(null);
 const capturedBlob = ref<Blob | null>(null);
@@ -163,6 +205,9 @@ const message = ref('');
 const facingMode = ref<'environment' | 'user'>('environment');
 const smartScan = ref(true);
 const longReceiptMode = ref(false);
+const manualAdjust = ref(true);
+const corners = ref<NormalizedCorner[]>(defaultReceiptCorners());
+const activeHandleIndex = ref<number | null>(null);
 const cameraSupported = Boolean(navigator.mediaDevices?.getUserMedia);
 
 const captureButtonLabel = computed(() => {
@@ -174,6 +219,10 @@ const captureButtonLabel = computed(() => {
   }
   return longReceiptMode.value ? 'Capture Segment' : 'Capture';
 });
+
+const polygonPoints = computed(() =>
+  corners.value.map((point) => `${(point.x * 100).toFixed(2)},${(point.y * 100).toFixed(2)}`).join(' ')
+);
 
 function clearStatus(): void {
   error.value = '';
@@ -251,6 +300,113 @@ function handleLongModeChange(): void {
   }
 }
 
+function constrainCorners(points: NormalizedCorner[]): NormalizedCorner[] {
+  const next = points.map((point) => ({
+    x: clamp(point.x, 0, 1),
+    y: clamp(point.y, 0, 1)
+  }));
+
+  const minGap = 0.03;
+
+  next[0].x = Math.min(next[0].x, next[1].x - minGap, next[3].x - minGap);
+  next[0].y = Math.min(next[0].y, next[3].y - minGap, next[1].y - minGap);
+
+  next[1].x = Math.max(next[1].x, next[0].x + minGap, next[2].x - minGap);
+  next[1].y = Math.min(next[1].y, next[2].y - minGap, next[0].y + 0.3);
+
+  next[2].x = Math.max(next[2].x, next[3].x + minGap, next[1].x);
+  next[2].y = Math.max(next[2].y, next[1].y + minGap, next[3].y);
+
+  next[3].x = Math.min(next[3].x, next[2].x - minGap, next[0].x + 0.3);
+  next[3].y = Math.max(next[3].y, next[0].y + minGap, next[2].y);
+
+  return next.map((point) => ({
+    x: clamp(point.x, 0, 1),
+    y: clamp(point.y, 0, 1)
+  }));
+}
+
+function cornerStyle(index: number): Record<string, string> {
+  const point = corners.value[index];
+  return {
+    left: `${point.x * 100}%`,
+    top: `${point.y * 100}%`
+  };
+}
+
+function updateCornerFromEvent(index: number, event: PointerEvent): void {
+  const image = previewImageEl.value;
+  if (!image) {
+    return;
+  }
+
+  const rect = image.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return;
+  }
+
+  const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+  const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+
+  const next = corners.value.map((point) => ({ ...point }));
+  next[index] = { x, y };
+  corners.value = constrainCorners(next);
+}
+
+function startHandleDrag(index: number, event: PointerEvent): void {
+  if (!manualAdjust.value) {
+    return;
+  }
+
+  activeHandleIndex.value = index;
+  const target = event.currentTarget as HTMLElement | null;
+  if (target && typeof target.setPointerCapture === 'function') {
+    target.setPointerCapture(event.pointerId);
+  }
+
+  updateCornerFromEvent(index, event);
+}
+
+function onGlobalPointerMove(event: PointerEvent): void {
+  if (activeHandleIndex.value === null) {
+    return;
+  }
+
+  updateCornerFromEvent(activeHandleIndex.value, event);
+}
+
+function onGlobalPointerUp(): void {
+  activeHandleIndex.value = null;
+}
+
+async function setCapturedPreview(blob: Blob): Promise<void> {
+  capturedBlob.value = blob;
+  setPreview(blob);
+  corners.value = defaultReceiptCorners();
+
+  try {
+    corners.value = await suggestReceiptCorners(blob);
+  } catch {
+    corners.value = defaultReceiptCorners();
+  }
+}
+
+async function applyAutoEdges(): Promise<void> {
+  if (!capturedBlob.value) {
+    return;
+  }
+
+  processingCapture.value = true;
+  try {
+    corners.value = await suggestReceiptCorners(capturedBlob.value);
+    message.value = 'Edges auto-detected. You can drag corners to refine.';
+  } catch {
+    error.value = 'Could not auto-detect edges for this image.';
+  } finally {
+    processingCapture.value = false;
+  }
+}
+
 async function capturePhoto(): Promise<void> {
   if (!videoEl.value || !canvasEl.value) {
     return;
@@ -281,8 +437,7 @@ async function capturePhoto(): Promise<void> {
       return;
     }
 
-    capturedBlob.value = blob;
-    setPreview(blob);
+    await setCapturedPreview(blob);
     stopCamera();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to create image capture';
@@ -302,8 +457,7 @@ async function finalizeLongScan(): Promise<void> {
 
   try {
     const stitched = await stitchReceiptSegments(segments.value);
-    capturedBlob.value = stitched;
-    setPreview(stitched);
+    await setCapturedPreview(stitched);
     stopCamera();
     message.value = `Long receipt scan ready. ${segments.value.length} segment${segments.value.length > 1 ? 's' : ''} stitched.`;
   } catch (err) {
@@ -317,11 +471,12 @@ async function retake(): Promise<void> {
   capturedBlob.value = null;
   clearPreview();
   resetSegments();
+  corners.value = defaultReceiptCorners();
   clearStatus();
   await startCamera();
 }
 
-function onFallbackFile(event: Event): void {
+async function onFallbackFile(event: Event): Promise<void> {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   if (!file) {
@@ -331,8 +486,7 @@ function onFallbackFile(event: Event): void {
   clearStatus();
   stopCamera();
 
-  capturedBlob.value = file;
-  setPreview(file);
+  await setCapturedPreview(file);
   resetSegments();
 }
 
@@ -346,10 +500,17 @@ async function uploadCapture(): Promise<void> {
   clearStatus();
 
   try {
+    let uploadBlob = capturedBlob.value;
+    if (manualAdjust.value) {
+      uploadBlob = await correctReceiptPerspective(uploadBlob, corners.value, {
+        enhance: smartScan.value
+      });
+    }
+
     const file = new File(
-      [capturedBlob.value],
+      [uploadBlob],
       `receipt-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`,
-      { type: capturedBlob.value.type || 'image/jpeg' }
+      { type: uploadBlob.type || 'image/jpeg' }
     );
 
     const created = await receipts.createReceipt(
@@ -373,6 +534,7 @@ async function uploadCapture(): Promise<void> {
     capturedBlob.value = null;
     clearPreview();
     resetSegments();
+    corners.value = defaultReceiptCorners();
     await startCamera();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to upload capture';
@@ -382,12 +544,22 @@ async function uploadCapture(): Promise<void> {
 }
 
 onMounted(async () => {
+  window.addEventListener('pointermove', onGlobalPointerMove);
+  window.addEventListener('pointerup', onGlobalPointerUp);
+  window.addEventListener('pointercancel', onGlobalPointerUp);
   await startCamera();
 });
 
 onUnmounted(() => {
+  window.removeEventListener('pointermove', onGlobalPointerMove);
+  window.removeEventListener('pointerup', onGlobalPointerUp);
+  window.removeEventListener('pointercancel', onGlobalPointerUp);
   stopCamera();
   clearPreview();
   resetSegments();
 });
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 </script>
