@@ -41,23 +41,26 @@
     <div class="receipt-detail-layout" style="margin-top: 1rem">
       <article class="card receipt-image-card">
         <div class="inline" style="justify-content: space-between">
-          <h3>Captured Image</h3>
+          <h3>Captured File</h3>
           <a
-            v-if="hasImage && !imageFailed"
+            v-if="hasAttachment"
             class="ghost receipt-image-action"
             :href="receiptImageUrl"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open Full Size
+            Open File
           </a>
         </div>
 
-        <div v-if="hasImage && !imageFailed" class="receipt-image-frame">
+        <div v-if="hasAttachment && canRenderImage && !imageFailed" class="receipt-image-frame">
           <img :src="receiptImageUrl" alt="Adjusted receipt capture" class="receipt-image" @error="onImageError" />
         </div>
+        <p v-else-if="hasAttachment" class="muted" style="margin: 0.5rem 0 0">
+          Preview is not available for this file type in-app. Use "Open File" to view it.
+        </p>
         <p v-else class="muted" style="margin: 0.5rem 0 0">
-          No captured image available for this receipt yet.
+          No captured file available for this receipt yet.
         </p>
       </article>
 
@@ -278,7 +281,15 @@ const form = ref<EditForm>(emptyForm());
 
 const isOfflineDraft = computed(() => Boolean(item.value?.offline));
 const lineItems = computed(() => item.value?.line_items ?? []);
-const hasImage = computed(() => Boolean(item.value?.file_path));
+const hasAttachment = computed(() => Boolean(item.value?.file_path));
+const canRenderImage = computed(() => {
+  const path = (item.value?.file_path || '').toLowerCase();
+  if (path.endsWith('.pdf')) {
+    return false;
+  }
+
+  return /\.(jpe?g|png|webp|gif|bmp)$/i.test(path);
+});
 const receiptImageUrl = computed(() => {
   if (!item.value || !item.value.file_path) {
     return '';

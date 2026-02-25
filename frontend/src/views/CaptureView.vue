@@ -1,16 +1,16 @@
 <template>
   <section class="page capture-page">
     <h1>Scan Receipt</h1>
-    <p class="muted">Capture or choose a receipt photo, adjust edges, then upload.</p>
+    <p class="muted">Capture or choose a receipt file, adjust edges for photos, then upload.</p>
 
     <ol class="capture-steps" aria-label="Receipt capture steps">
-      <li class="capture-step" :class="{ active: !previewUrl }">1. Capture</li>
-      <li class="capture-step" :class="{ active: !!previewUrl }">2. Adjust</li>
-      <li class="capture-step" :class="{ active: !!previewUrl }">3. Upload</li>
+      <li class="capture-step" :class="{ active: !hasSelection }">1. Capture</li>
+      <li class="capture-step" :class="{ active: isImageSelection }">2. Adjust</li>
+      <li class="capture-step" :class="{ active: hasSelection }">3. Upload</li>
     </ol>
 
     <div class="card camera-capture" style="margin-top: 1rem">
-      <div v-if="!previewUrl" class="capture-launch">
+      <div v-if="!hasSelection" class="capture-launch">
         <label class="primary capture-primary capture-input-label" :class="{ disabled: submitting || processingCapture }">
           Capture Receipt
           <input
@@ -23,19 +23,19 @@
           />
         </label>
         <label class="ghost capture-input-label capture-secondary" :class="{ disabled: submitting || processingCapture }">
-          Choose Existing Photo
+          Choose Existing File
           <input
             class="capture-file-overlay"
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf,text/plain,text/csv,application/vnd.ms-excel"
             :disabled="submitting || processingCapture"
             @change="onFileSelected"
           />
         </label>
-        <p class="muted capture-launch-copy">Camera opens directly on supported devices.</p>
+        <p class="muted capture-launch-copy">Supports photos plus PDF/text receipt documents.</p>
       </div>
 
-      <div v-else class="camera-stage is-preview">
+      <div v-else-if="isImageSelection" class="camera-stage is-preview">
         <div class="preview-editor-wrap">
           <div class="preview-editor">
             <img ref="previewImageEl" :src="previewUrl" alt="Receipt preview" class="camera-feed camera-feed-preview" />
@@ -58,21 +58,32 @@
           </div>
         </div>
       </div>
+      <div v-else class="capture-doc-card">
+        <h3>{{ selectedFile?.name || 'Receipt document selected' }}</h3>
+        <p class="muted" style="margin: 0">
+          {{ selectedFile ? `${formatFileSize(selectedFile.size)} · ${selectedFile.type || 'unknown type'}` : '' }}
+        </p>
+        <p class="muted" style="margin: 0">
+          This file will be uploaded directly and sent to AI extraction.
+        </p>
+      </div>
 
       <p class="muted capture-hint">
-        {{ previewUrl
+        {{ isImageSelection
           ? 'Drag corners to match the receipt edges, then upload selected area.'
-          : 'Tap Capture Receipt to continue.' }}
+          : hasSelection
+            ? 'Upload this document to continue.'
+            : 'Tap Capture Receipt to continue.' }}
       </p>
 
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="message" class="success">{{ message }}</p>
 
-      <div class="capture-actions" v-if="previewUrl">
+      <div class="capture-actions" v-if="hasSelection">
         <button type="button" class="ghost" :disabled="submitting || processingCapture" @click="clearSelection">Choose Another</button>
-        <button type="button" class="ghost" :disabled="submitting || processingCapture" @click="applyAutoEdges">Auto Fit</button>
+        <button v-if="isImageSelection" type="button" class="ghost" :disabled="submitting || processingCapture" @click="applyAutoEdges">Auto Fit</button>
         <button class="primary" :disabled="submitting || processingCapture" @click="uploadCapture">
-          {{ submitting ? 'Uploading...' : 'Upload Selected Area' }}
+          {{ submitting ? 'Uploading...' : isImageSelection ? 'Upload Selected Area' : 'Upload Document' }}
         </button>
       </div>
 
@@ -95,6 +106,7 @@ const receipts = useReceiptsStore();
 
 const previewImageEl = ref<HTMLImageElement | null>(null);
 const capturedBlob = ref<Blob | null>(null);
+const selectedFile = ref<File | null>(null);
 const previewUrl = ref('');
 const submitting = ref(false);
 const processingCapture = ref(false);
@@ -102,6 +114,8 @@ const error = ref('');
 const message = ref('');
 const corners = ref<NormalizedCorner[]>(defaultReceiptCorners());
 const activeHandleIndex = ref<number | null>(null);
+const hasSelection = computed(() => selectedFile.value !== null);
+const isImageSelection = computed(() => isImageFile(selectedFile.value));
 
 const polygonPoints = computed(() =>
   corners.value.map((point) => `${(point.x * 100).toFixed(2)},${(point.y * 100).toFixed(2)}`).join(' ')
@@ -114,6 +128,37 @@ function clamp(value: number, min: number, max: number): number {
 function clearStatus(): void {
   error.value = '';
   message.value = '';
+}
+
+function isImageFile(file: File | null): boolean {
+  if (!file) {
+    return false;
+  }
+
+  const type = (file.type || '').toLowerCase();
+  if (type.startsWith('image/')) {
+    return true;
+  }
+
+  return /\.(jpe?g|png|webp)$/i.test(file.name || '');
+}
+
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+
+  const decimals = unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(decimals)} ${units[unitIndex]}`;
 }
 
 function clearPreview(): void {
@@ -190,6 +235,7 @@ async function setCapturedPreview(blob: Blob): Promise<void> {
 }
 
 function clearSelection(): void {
+  selectedFile.value = null;
   capturedBlob.value = null;
   clearPreview();
   corners.value = defaultReceiptCorners();
@@ -204,12 +250,22 @@ async function onFileSelected(event: Event): Promise<void> {
   }
 
   clearStatus();
-  await setCapturedPreview(file);
+  selectedFile.value = file;
+
+  if (isImageFile(file)) {
+    await setCapturedPreview(file);
+  } else {
+    capturedBlob.value = null;
+    clearPreview();
+    corners.value = defaultReceiptCorners();
+    message.value = 'File selected. Upload to run extraction.';
+  }
+
   target.value = '';
 }
 
 async function applyAutoEdges(): Promise<void> {
-  if (!capturedBlob.value) {
+  if (!isImageSelection.value || !capturedBlob.value) {
     return;
   }
 
@@ -227,8 +283,8 @@ async function applyAutoEdges(): Promise<void> {
 }
 
 async function uploadCapture(): Promise<void> {
-  if (!capturedBlob.value) {
-    error.value = 'Capture or choose an image first.';
+  if (!selectedFile.value) {
+    error.value = 'Capture or choose a receipt file first.';
     return;
   }
 
@@ -236,13 +292,15 @@ async function uploadCapture(): Promise<void> {
   clearStatus();
 
   try {
-    const uploadBlob = await correctReceiptPerspective(capturedBlob.value, corners.value, { enhance: false });
-
-    const file = new File(
-      [uploadBlob],
-      `receipt-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`,
-      { type: uploadBlob.type || 'image/jpeg' }
-    );
+    let file = selectedFile.value;
+    if (isImageSelection.value && capturedBlob.value) {
+      const uploadBlob = await correctReceiptPerspective(capturedBlob.value, corners.value, { enhance: false });
+      file = new File(
+        [uploadBlob],
+        `receipt-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`,
+        { type: uploadBlob.type || 'image/jpeg' }
+      );
+    }
 
     const created = await receipts.createReceipt(
       {
@@ -280,6 +338,7 @@ async function uploadCapture(): Promise<void> {
       message.value = 'Receipt saved offline. It will sync when you reconnect.';
     }
 
+    selectedFile.value = null;
     capturedBlob.value = null;
     clearPreview();
     corners.value = defaultReceiptCorners();

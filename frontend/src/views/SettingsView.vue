@@ -51,7 +51,7 @@
 
           <label class="settings-toggle-row">
             <input type="checkbox" v-model="preferences.autoProcessAfterCapture" />
-            <span>Auto-run AI after capture (coming soon)</span>
+            <span>Auto-run AI after capture</span>
           </label>
 
           <label class="settings-toggle-row">

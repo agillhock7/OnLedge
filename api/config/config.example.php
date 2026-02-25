@@ -24,7 +24,11 @@ return [
         'allowed_mime_types' => [ // ALLOWED_MIME_TYPES
             'image/jpeg',
             'image/png',
+            'image/webp',
             'application/pdf',
+            'text/plain',
+            'text/csv',
+            'application/vnd.ms-excel',
         ],
     ],
     'session_cookie' => [

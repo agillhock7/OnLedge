@@ -64,14 +64,14 @@ final class ReceiptAiExtractor
             ];
         }
 
-        $image = $this->loadImageAsDataUrl((string) ($receipt['file_path'] ?? ''));
-        if ($image === null) {
+        $fileInput = $this->loadReceiptInput((string) ($receipt['file_path'] ?? ''));
+        if ($fileInput === null) {
             return [
                 'status' => 'skipped',
                 'provider' => 'openai',
                 'model' => $model,
                 'fields' => [],
-                'reason' => 'Receipt image is missing or unreadable.',
+                'reason' => 'Receipt file is missing, unreadable, or unsupported.',
             ];
         }
 
@@ -86,7 +86,7 @@ final class ReceiptAiExtractor
         }
 
         $existingRawText = trim((string) ($receipt['raw_text'] ?? ''));
-        $payload = $this->buildRequestPayload($model, $image['data_url'], $existingRawText, $maxOutputTokens);
+        $payload = $this->buildRequestPayload($model, $fileInput, $existingRawText, $maxOutputTokens);
 
         [$statusCode, $decoded, $error] = $this->postJson(
             $baseUrl . '/responses',
@@ -161,9 +161,9 @@ final class ReceiptAiExtractor
     }
 
     /**
-     * @return array{mime: string, data_url: string}|null
+     * @return array<string, mixed>|null
      */
-    private function loadImageAsDataUrl(string $filePath): ?array
+    private function loadReceiptInput(string $filePath): ?array
     {
         $path = trim($filePath);
         if ($path === '' || !is_file($path) || !is_readable($path)) {
@@ -176,7 +176,7 @@ final class ReceiptAiExtractor
             finfo_close($finfo);
         }
 
-        if (!is_string($mime) || !in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+        if (!is_string($mime) || $mime === '') {
             return null;
         }
 
@@ -185,10 +185,25 @@ final class ReceiptAiExtractor
             return null;
         }
 
-        return [
-            'mime' => $mime,
-            'data_url' => sprintf('data:%s;base64,%s', $mime, base64_encode($raw)),
-        ];
+        $filename = basename($path);
+        $dataUrl = sprintf('data:%s;base64,%s', $mime, base64_encode($raw));
+
+        if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+            return [
+                'type' => 'input_image',
+                'image_url' => $dataUrl,
+            ];
+        }
+
+        if (in_array($mime, ['application/pdf', 'text/plain', 'text/csv', 'application/vnd.ms-excel'], true)) {
+            return [
+                'type' => 'input_file',
+                'filename' => $filename !== '' ? $filename : 'receipt-document',
+                'file_data' => $dataUrl,
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -196,7 +211,7 @@ final class ReceiptAiExtractor
      */
     private function buildRequestPayload(
         string $model,
-        string $imageDataUrl,
+        array $fileInput,
         string $existingRawText,
         int $maxOutputTokens
     ): array
@@ -263,7 +278,7 @@ final class ReceiptAiExtractor
             ],
         ];
 
-        $textPrompt = "Extract all receipt fields with best effort.
+        $textPrompt = "Extract all receipt fields with best effort from this receipt image or document.
 Rules:
 - Return valid JSON only using the provided schema.
 - purchase_date must be YYYY-MM-DD when known.
@@ -291,7 +306,7 @@ Rules:
                     'role' => 'user',
                     'content' => [
                         ['type' => 'input_text', 'text' => $textPrompt],
-                        ['type' => 'input_image', 'image_url' => $imageDataUrl],
+                        $fileInput,
                     ],
                 ],
             ],

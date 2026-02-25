@@ -1454,6 +1454,20 @@ button.ghost {
   font-size: 0.84rem;
 }
 
+.capture-doc-card {
+  border: 1px dashed #9fc1be;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f9fcfb 0%, #f1f8f6 100%);
+  padding: 1rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.capture-doc-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
 .capture-input-label {
   position: relative;
   display: inline-flex;
