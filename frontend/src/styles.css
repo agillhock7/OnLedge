@@ -591,6 +591,30 @@ button.ghost {
   padding: 0.45rem;
 }
 
+.camera-stage.is-empty {
+  background:
+    radial-gradient(20rem 14rem at 50% 0%, rgba(42, 123, 152, 0.22), rgba(10, 35, 44, 0) 72%),
+    #0b232d;
+}
+
+.capture-empty {
+  width: min(88%, 430px);
+  text-align: center;
+  color: #d4e7ec;
+}
+
+.capture-empty-title {
+  margin: 0;
+  font-family: 'Sora', 'Manrope', sans-serif;
+  font-size: clamp(1.2rem, 2.8vw, 1.5rem);
+}
+
+.capture-empty-copy {
+  margin: 0.55rem 0 0;
+  color: #a9c4cb;
+  font-size: 0.92rem;
+}
+
 .camera-feed {
   width: 100%;
   height: 100%;
@@ -1013,5 +1037,9 @@ button.ghost {
     width: 38px;
     height: 38px;
     min-width: 38px;
+  }
+
+  .capture-empty {
+    width: min(92%, 350px);
   }
 }

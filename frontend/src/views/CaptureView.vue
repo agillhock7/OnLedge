@@ -1,7 +1,7 @@
 <template>
   <section class="page capture-page">
     <h1>Scan Receipt</h1>
-    <p class="muted">Capture a receipt, adjust edges, and upload.</p>
+    <p class="muted">Tap capture, choose camera or gallery, adjust edges, then upload.</p>
 
     <ol class="capture-steps" aria-label="Receipt capture steps">
       <li class="capture-step" :class="{ active: !previewUrl }">1. Capture</li>
@@ -10,17 +10,13 @@
     </ol>
 
     <div class="card camera-capture" style="margin-top: 1rem">
-      <div class="camera-stage" :class="{ 'is-preview': !!previewUrl }">
-        <video
-          v-show="!previewUrl && cameraSupported"
-          ref="videoEl"
-          class="camera-feed camera-feed-live"
-          autoplay
-          muted
-          playsinline
-        ></video>
+      <div class="camera-stage" :class="{ 'is-preview': !!previewUrl, 'is-empty': !previewUrl }">
+        <div v-if="!previewUrl" class="capture-empty">
+          <p class="capture-empty-title">Ready to capture</p>
+          <p class="capture-empty-copy">Use your device camera or choose an existing receipt photo.</p>
+        </div>
 
-        <div v-if="previewUrl" class="preview-editor-wrap">
+        <div v-else class="preview-editor-wrap">
           <div class="preview-editor">
             <img ref="previewImageEl" :src="previewUrl" alt="Receipt preview" class="camera-feed camera-feed-preview" />
 
@@ -41,76 +37,45 @@
             </button>
           </div>
         </div>
-
-        <div v-if="!previewUrl && cameraSupported" class="camera-overlay" aria-hidden="true">
-          <div class="camera-guide">
-            <span class="guide-corner tl"></span>
-            <span class="guide-corner tr"></span>
-            <span class="guide-corner bl"></span>
-            <span class="guide-corner br"></span>
-          </div>
-        </div>
-
-        <div v-if="!cameraSupported" class="camera-placeholder">
-          Camera capture is not available in this browser. Use photo upload instead.
-        </div>
-
-        <canvas ref="canvasEl" style="display: none"></canvas>
       </div>
 
       <p class="muted capture-hint">
         {{ previewUrl
-          ? 'Drag each corner to match the receipt edges as tightly as possible.'
-          : 'Position the receipt inside the frame and tap Capture Receipt.' }}
+          ? 'Drag the corners to hug the receipt edges, then upload the selected area.'
+          : 'Tap Capture Receipt to open your device options.' }}
       </p>
 
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="message" class="success">{{ message }}</p>
 
       <div class="capture-actions" v-if="!previewUrl">
-        <button
-          class="primary capture-primary"
-          :disabled="starting || submitting || processingCapture || !cameraSupported || !stream"
-          @click="capturePhoto"
-        >
-          {{ starting ? 'Starting Camera...' : processingCapture ? 'Capturing...' : 'Capture Receipt' }}
+        <button class="primary capture-primary" :disabled="submitting || processingCapture" @click="openNativePicker">
+          Capture Receipt
         </button>
-
-        <button
-          type="button"
-          class="ghost"
-          :disabled="starting || submitting || processingCapture || !cameraSupported"
-          @click="switchCamera"
-        >
-          Switch Camera
-        </button>
-
-        <label class="ghost capture-file-label" :class="{ disabled: submitting || processingCapture }">
-          Choose Photo
-          <input
-            class="capture-file-input"
-            type="file"
-            accept="image/jpeg,image/png"
-            capture="environment"
-            :disabled="submitting || processingCapture"
-            @change="onFallbackFile"
-          />
-        </label>
       </div>
 
       <div class="capture-actions" v-else>
-        <button type="button" class="ghost" :disabled="submitting || processingCapture" @click="retake">Retake</button>
+        <button type="button" class="ghost" :disabled="submitting || processingCapture" @click="clearSelection">Choose Another</button>
         <button type="button" class="ghost" :disabled="submitting || processingCapture" @click="applyAutoEdges">Auto Fit</button>
         <button class="primary" :disabled="submitting || processingCapture" @click="uploadCapture">
           {{ submitting ? 'Uploading...' : 'Upload Selected Area' }}
         </button>
       </div>
+
+      <input
+        ref="fileInputEl"
+        class="capture-file-input"
+        type="file"
+        accept="image/*"
+        :disabled="submitting || processingCapture"
+        @change="onFileSelected"
+      />
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { useReceiptsStore } from '@/stores/receipts';
 import {
@@ -122,21 +87,16 @@ import {
 
 const receipts = useReceiptsStore();
 
-const videoEl = ref<HTMLVideoElement | null>(null);
+const fileInputEl = ref<HTMLInputElement | null>(null);
 const previewImageEl = ref<HTMLImageElement | null>(null);
-const canvasEl = ref<HTMLCanvasElement | null>(null);
-const stream = ref<MediaStream | null>(null);
 const capturedBlob = ref<Blob | null>(null);
 const previewUrl = ref('');
-const starting = ref(false);
 const submitting = ref(false);
 const processingCapture = ref(false);
 const error = ref('');
 const message = ref('');
-const facingMode = ref<'environment' | 'user'>('environment');
 const corners = ref<NormalizedCorner[]>(defaultReceiptCorners());
 const activeHandleIndex = ref<number | null>(null);
-const cameraSupported = Boolean(navigator.mediaDevices?.getUserMedia);
 
 const polygonPoints = computed(() =>
   corners.value.map((point) => `${(point.x * 100).toFixed(2)},${(point.y * 100).toFixed(2)}`).join(' ')
@@ -161,53 +121,6 @@ function clearPreview(): void {
 function setPreview(blob: Blob): void {
   clearPreview();
   previewUrl.value = URL.createObjectURL(blob);
-}
-
-function stopCamera(): void {
-  stream.value?.getTracks().forEach((track) => track.stop());
-  stream.value = null;
-  if (videoEl.value) {
-    videoEl.value.srcObject = null;
-  }
-}
-
-async function startCamera(): Promise<void> {
-  if (!cameraSupported || previewUrl.value) {
-    return;
-  }
-
-  stopCamera();
-  starting.value = true;
-  error.value = '';
-
-  try {
-    const mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: facingMode.value },
-        width: { ideal: 1080 },
-        height: { ideal: 1920 }
-      },
-      audio: false
-    });
-
-    stream.value = mediaStream;
-
-    await nextTick();
-
-    if (videoEl.value) {
-      videoEl.value.srcObject = mediaStream;
-      await videoEl.value.play();
-    }
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Unable to access camera';
-  } finally {
-    starting.value = false;
-  }
-}
-
-async function switchCamera(): Promise<void> {
-  facingMode.value = facingMode.value === 'environment' ? 'user' : 'environment';
-  await startCamera();
 }
 
 function cornerStyle(index: number): Record<string, string> {
@@ -271,6 +184,30 @@ async function setCapturedPreview(blob: Blob): Promise<void> {
   }
 }
 
+function openNativePicker(): void {
+  clearStatus();
+  fileInputEl.value?.click();
+}
+
+function clearSelection(): void {
+  capturedBlob.value = null;
+  clearPreview();
+  corners.value = defaultReceiptCorners();
+  clearStatus();
+}
+
+async function onFileSelected(event: Event): Promise<void> {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  clearStatus();
+  await setCapturedPreview(file);
+  target.value = '';
+}
+
 async function applyAutoEdges(): Promise<void> {
   if (!capturedBlob.value) {
     return;
@@ -287,67 +224,6 @@ async function applyAutoEdges(): Promise<void> {
   } finally {
     processingCapture.value = false;
   }
-}
-
-async function capturePhoto(): Promise<void> {
-  if (!videoEl.value || !canvasEl.value) {
-    return;
-  }
-
-  clearStatus();
-  processingCapture.value = true;
-
-  try {
-    const width = videoEl.value.videoWidth || 1280;
-    const height = videoEl.value.videoHeight || 720;
-    canvasEl.value.width = width;
-    canvasEl.value.height = height;
-
-    const context = canvasEl.value.getContext('2d');
-    if (!context) {
-      throw new Error('Unable to capture from camera');
-    }
-
-    context.drawImage(videoEl.value, 0, 0, width, height);
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvasEl.value?.toBlob((result) => {
-        if (!result) {
-          reject(new Error('Unable to create capture image'));
-          return;
-        }
-        resolve(result);
-      }, 'image/jpeg', 0.94);
-    });
-
-    await setCapturedPreview(blob);
-    stopCamera();
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Unable to capture receipt';
-  } finally {
-    processingCapture.value = false;
-  }
-}
-
-async function retake(): Promise<void> {
-  capturedBlob.value = null;
-  clearPreview();
-  corners.value = defaultReceiptCorners();
-  clearStatus();
-  await startCamera();
-}
-
-async function onFallbackFile(event: Event): Promise<void> {
-  const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (!file) {
-    return;
-  }
-
-  clearStatus();
-  stopCamera();
-  await setCapturedPreview(file);
-  target.value = '';
 }
 
 async function uploadCapture(): Promise<void> {
@@ -407,7 +283,6 @@ async function uploadCapture(): Promise<void> {
     capturedBlob.value = null;
     clearPreview();
     corners.value = defaultReceiptCorners();
-    await startCamera();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to upload receipt';
   } finally {
@@ -415,18 +290,16 @@ async function uploadCapture(): Promise<void> {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener('pointermove', onGlobalPointerMove);
   window.addEventListener('pointerup', onGlobalPointerUp);
   window.addEventListener('pointercancel', onGlobalPointerUp);
-  await startCamera();
 });
 
 onUnmounted(() => {
   window.removeEventListener('pointermove', onGlobalPointerMove);
   window.removeEventListener('pointerup', onGlobalPointerUp);
   window.removeEventListener('pointercancel', onGlobalPointerUp);
-  stopCamera();
   clearPreview();
 });
 </script>
