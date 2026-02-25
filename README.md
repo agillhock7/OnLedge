@@ -16,7 +16,7 @@
 
 ## Table Of Contents
 
-- [Live Project](#live-project)
+- [Project Links](#project-links)
 - [What OnLedge Includes](#what-onledge-includes)
 - [Hosting Model (Important)](#hosting-model-important)
 - [Architecture](#architecture)
@@ -38,10 +38,10 @@
 - [License](#license)
 - [Compatibility Notes](#compatibility-notes)
 
-## Live Project
+## Project Links
 
-- Production app: `https://onledge.gops.app`
-- Repository: `git@github.com:agillhock7/OnLedge.git`
+- Repository: `https://github.com/agillhock7/OnLedge`
+- Production URL: configure your own deployment domain in `api/config/config.php` (`app.url` / `app.api_base_url`)
 
 ## What OnLedge Includes
 
@@ -77,7 +77,7 @@ flowchart LR
   U["Browser / PWA"] -->|"HTTPS /api"| A["PHP API"]
   A -->|"SQL"| P[("PostgreSQL")]
   B["Local Build Machine"] -->|"npm run build"| D["deploy/public_html"]
-  D -->|".cpanel.yml copy"| W["/home/gopsapp1/onledge.gops.app"]
+  D -->|".cpanel.yml copy"| W["/home/<cpanel-user>/<app-domain>"]
 ```
 
 ## Repository Layout
@@ -194,18 +194,18 @@ Important PostgreSQL notes for shared hosts:
 
 ## Database Permissions (Required)
 
-After migrations, grant privileges to your app DB user (example: `gopsapp1_onledgeusr`):
+After migrations, grant privileges to your app DB user (example: `<APP_DB_USER>`):
 
 ```sql
-GRANT USAGE ON SCHEMA public TO gopsapp1_onledgeusr;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO gopsapp1_onledgeusr;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO gopsapp1_onledgeusr;
+GRANT USAGE ON SCHEMA public TO <APP_DB_USER>;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO <APP_DB_USER>;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO <APP_DB_USER>;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gopsapp1_onledgeusr;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO <APP_DB_USER>;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO gopsapp1_onledgeusr;
+  GRANT USAGE, SELECT ON SEQUENCES TO <APP_DB_USER>;
 ```
 
 Without these grants, API calls may fail with SQLSTATE `42501` permission errors.
@@ -237,8 +237,8 @@ Enable providers in `api/config/config.php`:
 - `oauth.discord.enabled = true`
 
 Set client credentials and exact callback URLs:
-- GitHub callback: `https://onledge.gops.app/api/auth/oauth/github/callback`
-- Discord callback: `https://onledge.gops.app/api/auth/oauth/discord/callback`
+- GitHub callback: `https://<your-domain>/api/auth/oauth/github/callback`
+- Discord callback: `https://<your-domain>/api/auth/oauth/discord/callback`
 
 Run migration `004_oauth_identities.sql` before using social login.
 
@@ -257,9 +257,9 @@ Enable notifications in `api/config/config.php`:
 ```php
 'smtp' => [
   'enabled' => true,
-  'from_email' => 'records@onledge.gops.app',
+  'from_email' => 'noreply@<your-domain>',
   'from_name' => 'OnLedge',
-  'reply_to' => 'support@onledge.gops.app',
+  'reply_to' => 'support@<your-domain>',
 ],
 ```
 
@@ -299,7 +299,7 @@ git push origin main
 ```yaml
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/gopsapp1/onledge.gops.app/
+    - export DEPLOYPATH=/home/<cpanel-user>/<app-domain>/
     - /bin/mkdir -p $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/uploads
     - /bin/mkdir -p $DEPLOYPATH/api
@@ -308,15 +308,15 @@ deployment:
 ```
 
 Deployment targets:
-- cPanel Git working tree: `/home/gopsapp1/repositories/onledge` (or `OnLedge` depending on server-side clone name)
-- Web root: `/home/gopsapp1/onledge.gops.app`
+- cPanel Git working tree: `/home/<cpanel-user>/repositories/<repo-name>`
+- Web root: `/home/<cpanel-user>/<app-domain>`
 
 ## Cron Job (Weekly Reports)
 
 Set a cPanel cron command:
 
 ```bash
-/usr/bin/php /home/gopsapp1/repositories/OnLedge/scripts/run-weekly-report-cron.php >> /home/gopsapp1/logs/onledge-weekly-cron.log 2>&1
+/usr/bin/php /home/<cpanel-user>/repositories/<repo-name>/scripts/run-weekly-report-cron.php >> /home/<cpanel-user>/logs/onledge-weekly-cron.log 2>&1
 ```
 
 Recommended schedule:
@@ -330,6 +330,7 @@ Public repo guardrails:
 - Never commit real DB/API/SMTP credentials.
 - Never commit uploaded receipt files.
 - Keep deploy artifacts secret-free.
+- Keep server usernames, absolute server paths, and private operational identifiers out of docs when possible.
 
 Application baseline:
 - Passwords hashed via `password_hash()`.
