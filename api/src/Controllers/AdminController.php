@@ -27,15 +27,19 @@ final class AdminController
         $this->ensureAdminSchema();
         $this->currentAdmin();
 
-        $stmt = $this->db->query(
-            sprintf(
-                'SELECT %s
-                 FROM users
-                 ORDER BY created_at DESC
-                 LIMIT 500',
-                $this->userSelectColumnsSql(),
-            )
-        );
+        try {
+            $stmt = $this->db->query(
+                sprintf(
+                    'SELECT %s
+                     FROM users
+                     ORDER BY created_at DESC
+                     LIMIT 500',
+                    $this->userSelectColumnsSql(),
+                )
+            );
+        } catch (PDOException $exception) {
+            $this->throwMappedPdo($exception, 'loading admin users');
+        }
 
         $items = $stmt->fetchAll() ?: [];
         $items = array_map(static fn (array $row): array => Authz::normalizeUser($row), $items);
@@ -92,10 +96,7 @@ final class AdminController
             if ($exception->getCode() === '23505') {
                 throw new HttpException('Email is already registered', 409);
             }
-            if ($exception->getCode() === '23514') {
-                throw new HttpException('User role violates database constraint. Re-run admin migration.', 422);
-            }
-            throw $exception;
+            $this->throwMappedPdo($exception, 'creating admin user');
         }
 
         Response::json(['item' => Authz::normalizeUser($user ?: [])], 201);
@@ -178,10 +179,7 @@ final class AdminController
             $stmt->execute($payload);
             $updated = $stmt->fetch();
         } catch (PDOException $exception) {
-            if ($exception->getCode() === '23514') {
-                throw new HttpException('User role violates database constraint. Re-run admin migration.', 422);
-            }
-            throw $exception;
+            $this->throwMappedPdo($exception, 'updating admin user');
         }
 
         Response::json(['item' => Authz::normalizeUser($updated ?: [])]);
@@ -223,5 +221,32 @@ final class AdminController
         }
 
         return implode(', ', $columns);
+    }
+
+    private function throwMappedPdo(PDOException $exception, string $context): never
+    {
+        $sqlState = (string) $exception->getCode();
+        $rawMessage = strtolower($exception->getMessage());
+
+        if ($sqlState === '23505') {
+            throw new HttpException('Email is already registered', 409);
+        }
+        if ($sqlState === '23514') {
+            throw new HttpException('Database constraint violation while managing users. Verify allowed role values and constraints.', 422);
+        }
+        if ($sqlState === '42501' || str_contains($rawMessage, 'permission denied')) {
+            throw new HttpException('Database permission denied while managing users. Grant table/sequence/function privileges to the app user.', 500);
+        }
+        if (in_array($sqlState, ['42P01', '42703'], true)) {
+            throw new HttpException('Admin schema is outdated. Run migration 002_admin_support.sql and ensure users columns exist.', 500);
+        }
+        if ($sqlState === '42883') {
+            throw new HttpException('Required database function is missing. Recreate set_updated_at() and related triggers.', 500);
+        }
+
+        throw new HttpException(
+            sprintf('Database failure while %s (SQLSTATE %s).', $context, $sqlState !== '' ? $sqlState : 'unknown'),
+            500
+        );
     }
 }
