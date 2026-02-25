@@ -110,7 +110,12 @@ final class AuthController
             return;
         }
 
-        $stmt = $this->db->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+        $stmt = $this->db->prepare(
+            'SELECT id
+             FROM users
+             WHERE lower(trim(email)) = :email
+             LIMIT 1'
+        );
         $stmt->execute([':email' => $email]);
         $user = $stmt->fetch();
 
@@ -246,7 +251,15 @@ final class AuthController
             $columns = [...$columns, 'role', 'is_active', 'is_seed', 'updated_at', 'disabled_at'];
         }
 
-        $stmt = $this->db->prepare(sprintf('SELECT %s FROM users WHERE email = :email LIMIT 1', implode(', ', $columns)));
+        $stmt = $this->db->prepare(
+            sprintf(
+                'SELECT %s
+                 FROM users
+                 WHERE lower(trim(email)) = :email
+                 LIMIT 1',
+                implode(', ', $columns)
+            )
+        );
         $stmt->execute([':email' => $email]);
         $user = $stmt->fetch();
 
