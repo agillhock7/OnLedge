@@ -28,7 +28,10 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,ico,png}']
+        globPatterns: ['**/*.{js,css,html,svg,ico,png}'],
+        // OAuth uses top-level browser navigations to /api/auth/oauth/*.
+        // Never rewrite API navigations to SPA index.html.
+        navigateFallbackDenylist: [/^\/api\//]
       }
     })
   ],
