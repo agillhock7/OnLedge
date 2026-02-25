@@ -53,12 +53,35 @@
           </a>
         </div>
 
-        <div v-if="hasAttachment && canRenderImage && !imageFailed" class="receipt-image-frame">
-          <img :src="receiptImageUrl" alt="Adjusted receipt capture" class="receipt-image" @error="onImageError" />
+        <div v-if="hasAttachment" class="receipt-preview-shell">
+          <p v-if="previewLoading" class="muted receipt-preview-note">Loading preview...</p>
+
+          <template v-else-if="previewKind === 'image'">
+            <div v-if="!imageFailed" class="receipt-image-frame">
+              <img :src="receiptImageUrl" alt="Adjusted receipt capture" class="receipt-image" @error="onImageError" />
+            </div>
+            <p v-else class="muted receipt-preview-note">Image preview failed. Use "Open File" to view it.</p>
+          </template>
+
+          <template v-else-if="previewKind === 'pdf'">
+            <div class="receipt-doc-frame">
+              <iframe :src="receiptImageUrl" title="Receipt PDF preview" loading="lazy"></iframe>
+            </div>
+          </template>
+
+          <template v-else-if="previewKind === 'text'">
+            <div class="receipt-text-frame">
+              <pre class="receipt-text-preview">{{ textPreview }}</pre>
+            </div>
+            <p v-if="textPreviewTruncated" class="muted receipt-preview-note">
+              Showing first {{ TEXT_PREVIEW_LIMIT.toLocaleString() }} characters.
+            </p>
+          </template>
+
+          <p v-else class="muted receipt-preview-note">
+            {{ previewNotice || 'Preview is not available for this file type in-app. Use "Open File" to view it.' }}
+          </p>
         </div>
-        <p v-else-if="hasAttachment" class="muted" style="margin: 0.5rem 0 0">
-          Preview is not available for this file type in-app. Use "Open File" to view it.
-        </p>
         <p v-else class="muted" style="margin: 0.5rem 0 0">
           No captured file available for this receipt yet.
         </p>
@@ -276,19 +299,27 @@ const processing = ref(false);
 const saving = ref(false);
 const editing = ref(false);
 const imageFailed = ref(false);
+const previewKind = ref<'none' | 'image' | 'pdf' | 'text' | 'unsupported'>('none');
+const previewLoading = ref(false);
+const previewNotice = ref('');
+const textPreview = ref('');
+const textPreviewTruncated = ref(false);
+const TEXT_PREVIEW_LIMIT = 24000;
+let previewRunId = 0;
 
 const form = ref<EditForm>(emptyForm());
 
 const isOfflineDraft = computed(() => Boolean(item.value?.offline));
 const lineItems = computed(() => item.value?.line_items ?? []);
 const hasAttachment = computed(() => Boolean(item.value?.file_path));
-const canRenderImage = computed(() => {
-  const path = (item.value?.file_path || '').toLowerCase();
-  if (path.endsWith('.pdf')) {
-    return false;
+const attachmentExtension = computed(() => {
+  const filePath = (item.value?.file_path || '').split('?')[0];
+  const dotIndex = filePath.lastIndexOf('.');
+  if (dotIndex < 0) {
+    return '';
   }
 
-  return /\.(jpe?g|png|webp|gif|bmp)$/i.test(path);
+  return filePath.slice(dotIndex + 1).toLowerCase();
 });
 const receiptImageUrl = computed(() => {
   if (!item.value || !item.value.file_path) {
@@ -318,8 +349,9 @@ const processingTrace = computed<Array<Record<string, unknown>>>(() => {
 watch(
   () => receiptImageUrl.value,
   () => {
-    imageFailed.value = false;
-  }
+    void resolveAttachmentPreview();
+  },
+  { immediate: true }
 );
 
 onMounted(async () => {
@@ -331,6 +363,100 @@ async function loadReceipt(): Promise<void> {
   item.value = await receipts.getById(id);
   if (item.value) {
     syncFormWithItem(item.value);
+  }
+}
+
+async function resolveAttachmentPreview(): Promise<void> {
+  previewRunId += 1;
+  const runId = previewRunId;
+
+  imageFailed.value = false;
+  previewLoading.value = false;
+  previewNotice.value = '';
+  textPreview.value = '';
+  textPreviewTruncated.value = false;
+
+  if (!hasAttachment.value || !receiptImageUrl.value) {
+    previewKind.value = 'none';
+    return;
+  }
+
+  const ext = attachmentExtension.value;
+  const imageExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']);
+  const textExtensions = new Set(['txt', 'csv', 'log']);
+
+  if (imageExtensions.has(ext)) {
+    previewKind.value = 'image';
+    return;
+  }
+
+  if (ext === 'pdf') {
+    previewKind.value = 'pdf';
+    return;
+  }
+
+  if (textExtensions.has(ext)) {
+    await loadTextPreview(receiptImageUrl.value, runId);
+    return;
+  }
+
+  previewKind.value = 'unsupported';
+}
+
+async function loadTextPreview(url: string, runId: number): Promise<void> {
+  previewKind.value = 'text';
+  previewLoading.value = true;
+  previewNotice.value = '';
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    });
+
+    if (runId !== previewRunId) {
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error('Could not load file preview.');
+    }
+
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    const isTextContent =
+      contentType.startsWith('text/') ||
+      contentType.includes('csv') ||
+      contentType.includes('plain') ||
+      contentType.includes('excel');
+
+    if (!isTextContent) {
+      throw new Error('This document type is not supported for inline preview.');
+    }
+
+    const raw = await response.text();
+    if (runId !== previewRunId) {
+      return;
+    }
+
+    if (/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(raw.slice(0, 1024))) {
+      throw new Error('This file appears to be binary and cannot be previewed as text.');
+    }
+
+    textPreview.value = raw.slice(0, TEXT_PREVIEW_LIMIT);
+    textPreviewTruncated.value = raw.length > TEXT_PREVIEW_LIMIT;
+    previewKind.value = 'text';
+  } catch (err) {
+    if (runId !== previewRunId) {
+      return;
+    }
+
+    previewKind.value = 'unsupported';
+    previewNotice.value = err instanceof Error ? err.message : 'Preview is unavailable for this attachment.';
+  } finally {
+    if (runId === previewRunId) {
+      previewLoading.value = false;
+    }
   }
 }
 

@@ -2084,6 +2084,15 @@ button.ghost {
   gap: 0.65rem;
 }
 
+.receipt-preview-shell {
+  display: grid;
+  gap: 0.52rem;
+}
+
+.receipt-preview-note {
+  margin: 0.2rem 0 0;
+}
+
 .receipt-image-frame {
   border: 1px solid #b9cecd;
   border-radius: 16px;
@@ -2101,6 +2110,42 @@ button.ghost {
   max-width: 100%;
   height: auto;
   display: block;
+}
+
+.receipt-doc-frame {
+  border: 1px solid #b9cecd;
+  border-radius: 16px;
+  background: #f6fbfa;
+  min-height: 360px;
+  height: min(74vh, 760px);
+  overflow: hidden;
+}
+
+.receipt-doc-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+
+.receipt-text-frame {
+  border: 1px solid #b9cecd;
+  border-radius: 16px;
+  background: #f8fbfa;
+  min-height: 280px;
+  max-height: 74vh;
+  overflow: auto;
+}
+
+.receipt-text-preview {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  color: #18353f;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.83rem;
+  line-height: 1.45;
 }
 
 .receipt-image-action {
@@ -2582,6 +2627,16 @@ button.ghost {
 
   .receipt-image-frame {
     min-height: 240px;
+    max-height: 62vh;
+  }
+
+  .receipt-doc-frame {
+    min-height: 240px;
+    height: 62vh;
+  }
+
+  .receipt-text-frame {
+    min-height: 220px;
     max-height: 62vh;
   }
 
