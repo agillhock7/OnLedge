@@ -79,6 +79,7 @@ final class RuleEngine
     private static function matches(array $receipt, array $conditions): bool
     {
         $all = $conditions['all'] ?? null;
+        $any = $conditions['any'] ?? null;
 
         if (is_array($all)) {
             foreach ($all as $condition) {
@@ -87,6 +88,15 @@ final class RuleEngine
                 }
             }
             return true;
+        }
+
+        if (is_array($any)) {
+            foreach ($any as $condition) {
+                if (is_array($condition) && self::matchCondition($receipt, $condition)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         return self::matchCondition($receipt, $conditions);
@@ -103,17 +113,86 @@ final class RuleEngine
         }
 
         $actual = $receipt[$field];
+        $actualText = strtolower(trim((string) $actual));
+        $targetText = strtolower(trim((string) $value));
 
         return match ($operator) {
-            'equals' => (string) $actual === (string) $value,
-            'contains' => str_contains(strtolower((string) $actual), strtolower((string) $value)),
+            'equals' => self::matchesEquals($actual, $value),
+            'not_equals' => !self::matchesEquals($actual, $value),
+            'contains' => self::matchesContains($actual, $value),
+            'not_contains' => !self::matchesContains($actual, $value),
+            'starts_with' => $targetText !== '' && str_starts_with($actualText, $targetText),
+            'ends_with' => $targetText !== '' && str_ends_with($actualText, $targetText),
             'gt' => (float) $actual > (float) $value,
             'gte' => (float) $actual >= (float) $value,
             'lt' => (float) $actual < (float) $value,
             'lte' => (float) $actual <= (float) $value,
-            'in' => is_array($value) && in_array((string) $actual, array_map('strval', $value), true),
+            'in' => self::matchesIn($actual, $value),
             default => false,
         };
+    }
+
+    private static function matchesEquals(mixed $actual, mixed $target): bool
+    {
+        if (is_array($actual)) {
+            $normalizedActual = array_map(static fn (mixed $item): string => strtolower(trim((string) $item)), $actual);
+            if (is_array($target)) {
+                $normalizedTarget = array_map(static fn (mixed $item): string => strtolower(trim((string) $item)), $target);
+                sort($normalizedActual);
+                sort($normalizedTarget);
+                return $normalizedActual === $normalizedTarget;
+            }
+
+            return in_array(strtolower(trim((string) $target)), $normalizedActual, true);
+        }
+
+        return strtolower(trim((string) $actual)) === strtolower(trim((string) $target));
+    }
+
+    private static function matchesContains(mixed $actual, mixed $target): bool
+    {
+        if (is_array($actual)) {
+            $needle = strtolower(trim((string) $target));
+            if ($needle === '') {
+                return false;
+            }
+
+            foreach ($actual as $item) {
+                if (strtolower(trim((string) $item)) === $needle) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        $haystack = strtolower((string) $actual);
+        $needle = strtolower(trim((string) $target));
+        return $needle !== '' && str_contains($haystack, $needle);
+    }
+
+    private static function matchesIn(mixed $actual, mixed $target): bool
+    {
+        if (!is_array($target)) {
+            return false;
+        }
+
+        $set = array_map(static fn (mixed $item): string => strtolower(trim((string) $item)), $target);
+        if ($set === []) {
+            return false;
+        }
+
+        if (is_array($actual)) {
+            foreach ($actual as $item) {
+                if (in_array(strtolower(trim((string) $item)), $set, true)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return in_array(strtolower(trim((string) $actual)), $set, true);
     }
 
     /**
