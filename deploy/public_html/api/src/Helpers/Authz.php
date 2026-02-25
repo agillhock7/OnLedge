@@ -34,11 +34,16 @@ final class Authz
     /** @return array<string, mixed> */
     public static function findUser(PDO $db, int $userId): array
     {
+        $columns = ['id', 'email', 'created_at'];
+        if (Schema::hasAdminUserColumns($db)) {
+            $columns = [...$columns, 'role', 'is_active', 'is_seed', 'updated_at', 'disabled_at'];
+        }
+
         $stmt = $db->prepare(
-            'SELECT id, email, role, is_active, is_seed, created_at, updated_at, disabled_at
-             FROM users
-             WHERE id = :id
-             LIMIT 1'
+            sprintf(
+                'SELECT %s FROM users WHERE id = :id LIMIT 1',
+                implode(', ', $columns)
+            )
         );
         $stmt->execute([':id' => $userId]);
         $user = $stmt->fetch();

@@ -154,6 +154,7 @@ Required production settings in `api/config/config.php`:
 - DB connection (`host`, `port`, `dbname`, `user`, `password`, `sslmode`)
 - upload constraints (`uploads.dir`, `max_upload_mb`, `allowed_mime_types`)
 - secure session cookies (`secure`, `httponly`, `samesite`)
+- optional OAuth providers (`oauth.github.*`, `oauth.discord.*`)
 
 Reference key map: `api/.env.example`
 
@@ -164,7 +165,11 @@ Run migrations in order:
 ```bash
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/001_init.sql
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/002_admin_support.sql
+psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/004_oauth_identities.sql
 ```
+
+If using pgAdmin query window, paste file contents directly.
+Do not use `\\i` there (`\\i` is a psql shell command, not SQL).
 
 Migration includes:
 
@@ -173,18 +178,19 @@ Migration includes:
 - update triggers
 - extension-free UUID generation (`onledge_uuid_v4`) for shared hosts without `pgcrypto`
 - role-based users (`user`, `admin`, `owner`) and support ticket tables
+- OAuth identity linking table (`oauth_identities`) for GitHub/Discord login
 
 ## Admin Bootstrap
 
 Seed an initial owner account (one-time setup):
 
-1. Generate a password hash:
+1. Generate a ready-to-run seed SQL block + one-time credentials:
 
 ```bash
-php -r "echo password_hash('ChangeMe-Strong-Password', PASSWORD_DEFAULT), PHP_EOL;"
+php scripts/create-seed-owner.php
 ```
 
-2. Open `api/migrations/003_seed_owner.example.sql`, replace placeholders, and run it in PostgreSQL.
+2. Copy the generated SQL output and run it in pgAdmin.
 3. Login with seeded owner account.
 4. In **Settings > Admin: User Management**, create permanent admin/owner users.
 5. Disable the seed account after permanent access is verified.
@@ -283,6 +289,11 @@ Auth:
 - `POST /api/auth/logout`
 - `POST /api/auth/forgot-password`
 - `GET /api/auth/me`
+- `GET /api/auth/oauth/providers`
+- `GET /api/auth/oauth/github/start`
+- `GET /api/auth/oauth/github/callback`
+- `GET /api/auth/oauth/discord/start`
+- `GET /api/auth/oauth/discord/callback`
 
 Receipts:
 

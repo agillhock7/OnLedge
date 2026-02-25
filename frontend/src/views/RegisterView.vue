@@ -23,6 +23,10 @@
           <router-link to="/login">Back to login</router-link>
         </div>
       </form>
+
+      <p class="muted" style="margin-top: 0.8rem">
+        Prefer social login? <router-link to="/login">Use GitHub or Discord from login.</router-link>
+      </p>
     </div>
   </div>
 </template>

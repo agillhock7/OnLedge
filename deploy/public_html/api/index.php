@@ -51,7 +51,7 @@ try {
     $db = Database::connection($config['database']);
     $auth = new SessionAuth();
 
-    $authController = new AuthController($db, $auth);
+    $authController = new AuthController($db, $auth, $config);
     $receiptController = new ReceiptController($db, $auth, $config);
     $ruleController = new RuleController($db, $auth);
     $searchController = new SearchController($db, $auth);
@@ -80,6 +80,15 @@ try {
     });
     $router->get('/auth/me', function () use ($authController): void {
         $authController->me();
+    });
+    $router->get('/auth/oauth/providers', function () use ($authController): void {
+        $authController->oauthProviders();
+    });
+    $router->get('/auth/oauth/{provider}/start', function (array $params) use ($authController): void {
+        $authController->oauthStart($params);
+    });
+    $router->get('/auth/oauth/{provider}/callback', function (array $params) use ($authController): void {
+        $authController->oauthCallback($params);
     });
 
     $router->get('/receipts', function () use ($receiptController): void {
@@ -156,13 +165,24 @@ try {
     $errorId = bin2hex(random_bytes(4));
     error_log(sprintf('[OnLedge][PDO][%s] %s | SQLSTATE %s', $errorId, $exception->getMessage(), (string) $exception->getCode()));
 
+    $sqlState = (string) $exception->getCode();
+    $rawMessage = strtolower($exception->getMessage());
+    $safeError = null;
+    if (in_array($sqlState, ['42P01', '42703'], true)) {
+        $safeError = 'Database schema is outdated. Apply latest migrations (002 and 004).';
+    } elseif ($sqlState === '42501') {
+        $safeError = 'Database permission denied. Grant table and sequence privileges to the app user.';
+    } elseif (str_starts_with($sqlState, '08')) {
+        $safeError = 'Database connection failed. Check host, port, SSL mode, and reachability.';
+    } elseif (str_contains($rawMessage, 'could not find driver')) {
+        $safeError = 'PHP PDO PostgreSQL driver is missing on server (pdo_pgsql not enabled).';
+    }
+
     if (!$debugErrors) {
-        Response::json(['error' => 'Database error during request.', 'error_id' => $errorId], 500);
+        Response::json(['error' => $safeError ?? 'Database error during request.', 'error_id' => $errorId], 500);
         return;
     }
 
-    $sqlState = (string) $exception->getCode();
-    $rawMessage = strtolower($exception->getMessage());
     $error = match ($sqlState) {
         '42P01' => 'Database schema is missing. Run migrations before using the API.',
         '3D000' => 'Database does not exist for configured credentials.',

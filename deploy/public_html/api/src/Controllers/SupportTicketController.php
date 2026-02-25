@@ -9,6 +9,7 @@ use App\Helpers\Authz;
 use App\Helpers\HttpException;
 use App\Helpers\Request;
 use App\Helpers\Response;
+use App\Helpers\Schema;
 use PDO;
 
 final class SupportTicketController
@@ -19,6 +20,7 @@ final class SupportTicketController
 
     public function create(): void
     {
+        $this->ensureSupportSchema();
         $userId = $this->auth->requireUserId();
         Authz::requireActiveUser($this->db, $userId);
 
@@ -57,6 +59,7 @@ final class SupportTicketController
 
     public function mine(): void
     {
+        $this->ensureSupportSchema();
         $userId = $this->auth->requireUserId();
         Authz::requireActiveUser($this->db, $userId);
 
@@ -79,6 +82,7 @@ final class SupportTicketController
 
     public function adminIndex(): void
     {
+        $this->ensureSupportSchema();
         $actor = $this->currentAdmin();
 
         $status = strtolower(trim((string) Request::query('status', '')));
@@ -123,6 +127,7 @@ final class SupportTicketController
     /** @param array<string, string> $params */
     public function adminUpdate(array $params): void
     {
+        $this->ensureSupportSchema();
         $actor = $this->currentAdmin();
         $ticketId = (int) ($params['id'] ?? 0);
         if ($ticketId <= 0) {
@@ -202,6 +207,13 @@ final class SupportTicketController
     {
         $userId = $this->auth->requireUserId();
         return Authz::requireAdmin($this->db, $userId);
+    }
+
+    private function ensureSupportSchema(): void
+    {
+        if (!Schema::hasAdminUserColumns($this->db) || !Schema::hasSupportTickets($this->db)) {
+            throw new HttpException('Support schema missing. Run migration 002_admin_support.sql', 503);
+        }
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */

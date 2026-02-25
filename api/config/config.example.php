@@ -42,4 +42,18 @@ return [
         'from_email' => 'noreply@example.com',
         'from_name' => 'OnLedge',
     ],
+    'oauth' => [
+        'github' => [
+            'enabled' => false,
+            'client_id' => '',
+            'client_secret' => '',
+            'redirect_uri' => 'https://onledge.gops.app/api/auth/oauth/github/callback',
+        ],
+        'discord' => [
+            'enabled' => false,
+            'client_id' => '',
+            'client_secret' => '',
+            'redirect_uri' => 'https://onledge.gops.app/api/auth/oauth/discord/callback',
+        ],
+    ],
 ];

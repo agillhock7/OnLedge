@@ -9,6 +9,7 @@ use App\Helpers\Authz;
 use App\Helpers\HttpException;
 use App\Helpers\Request;
 use App\Helpers\Response;
+use App\Helpers\Schema;
 use PDO;
 use PDOException;
 
@@ -20,6 +21,7 @@ final class AdminController
 
     public function users(): void
     {
+        $this->ensureAdminSchema();
         $this->currentAdmin();
 
         $stmt = $this->db->query(
@@ -37,6 +39,7 @@ final class AdminController
 
     public function createUser(): void
     {
+        $this->ensureAdminSchema();
         $actor = $this->currentAdmin();
         $input = Request::input();
 
@@ -89,6 +92,7 @@ final class AdminController
     /** @param array<string, string> $params */
     public function updateUser(array $params): void
     {
+        $this->ensureAdminSchema();
         $actor = $this->currentAdmin();
         $targetId = (int) ($params['id'] ?? 0);
         if ($targetId <= 0) {
@@ -164,5 +168,12 @@ final class AdminController
     {
         $userId = $this->auth->requireUserId();
         return Authz::requireAdmin($this->db, $userId);
+    }
+
+    private function ensureAdminSchema(): void
+    {
+        if (!Schema::hasAdminUserColumns($this->db)) {
+            throw new HttpException('Admin schema missing. Run migration 002_admin_support.sql', 503);
+        }
     }
 }
