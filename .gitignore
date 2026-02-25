@@ -1,0 +1,24 @@
+# Node
+frontend/node_modules/
+frontend/.vite/
+frontend/.env.local
+
+# Build outputs
+frontend/dist/
+
+# Local environment / secrets
+api/config/config.php
+deploy/public_html/api/config/config.php
+api/.env
+api/config/*.local.php
+
+# Runtime files
+*.log
+.DS_Store
+
+# Optional deploy artifacts
+# Keep deploy/public_html tracked for cPanel copy workflow
+# but never commit runtime user uploads.
+deploy/public_html/uploads/*
+!deploy/public_html/uploads/.gitkeep
+!deploy/public_html/uploads/.htaccess

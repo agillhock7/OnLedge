@@ -1,0 +1,8 @@
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/gopsapp1/onledge.gops.app/
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/mkdir -p $DEPLOYPATH/uploads
+    - /bin/mkdir -p $DEPLOYPATH/api
+    - /bin/chmod 775 $DEPLOYPATH/uploads
+    - /bin/cp -R deploy/public_html/. $DEPLOYPATH

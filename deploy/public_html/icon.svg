@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="OnLedge icon">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#16343f"/>
+      <stop offset="100%" stop-color="#ae6a2a"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="#f4efe5"/>
+  <path d="M52 64h152v18H52zm24 46h104v108H76z" fill="url(#g)"/>
+  <path d="M98 132h60M98 160h60M98 188h44" stroke="#f4efe5" stroke-width="10" stroke-linecap="round"/>
+</svg>
