@@ -89,7 +89,7 @@ final class AdminController
                 ':email' => $email,
                 ':password_hash' => $hash,
                 ':role' => $role,
-                ':is_seed' => $isSeed,
+                ':is_seed' => $isSeed ? 'true' : 'false',
             ]);
             $user = $stmt->fetch();
         } catch (PDOException $exception) {
@@ -141,7 +141,7 @@ final class AdminController
             }
 
             $fields[] = 'is_seed = :is_seed';
-            $payload[':is_seed'] = (bool) $input['is_seed'];
+            $payload[':is_seed'] = ((bool) $input['is_seed']) ? 'true' : 'false';
         }
 
         if (array_key_exists('is_active', $input)) {
@@ -155,7 +155,7 @@ final class AdminController
             }
 
             $fields[] = 'is_active = :is_active';
-            $payload[':is_active'] = $isActive;
+            $payload[':is_active'] = $isActive ? 'true' : 'false';
 
             if ($this->hasUserColumn('disabled_at')) {
                 $fields[] = 'disabled_at = :disabled_at';
@@ -233,6 +233,9 @@ final class AdminController
         }
         if ($sqlState === '23514') {
             throw new HttpException('Database constraint violation while managing users. Verify allowed role values and constraints.', 422);
+        }
+        if ($sqlState === '22P02') {
+            throw new HttpException('Invalid input format for database field while managing users. Check boolean/status values.', 422);
         }
         if ($sqlState === '42501' || str_contains($rawMessage, 'permission denied')) {
             throw new HttpException('Database permission denied while managing users. Grant table/sequence/function privileges to the app user.', 500);
