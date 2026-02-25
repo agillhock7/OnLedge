@@ -13,7 +13,27 @@ use App\Helpers\HttpException;
 use App\Helpers\Response;
 use App\Router\Router;
 
-require_once __DIR__ . '/../src/bootstrap.php';
+$bootstrapCandidates = [
+    __DIR__ . '/../src/bootstrap.php', // source tree: /api/public -> /api/src
+    __DIR__ . '/src/bootstrap.php',    // deployed tree: /api -> /api/src
+];
+
+$bootstrapPath = null;
+foreach ($bootstrapCandidates as $candidate) {
+    if (is_file($candidate)) {
+        $bootstrapPath = $candidate;
+        break;
+    }
+}
+
+if ($bootstrapPath === null) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'API bootstrap file not found']);
+    exit;
+}
+
+require_once $bootstrapPath;
 
 $config = ['app' => ['env' => 'production']];
 
