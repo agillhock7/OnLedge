@@ -59,7 +59,7 @@ try {
     $exportController = new ExportController($db, $auth);
     $reportsController = new ReportsController($db, $auth, $config);
     $adminController = new AdminController($db, $auth);
-    $supportTicketController = new SupportTicketController($db, $auth);
+    $supportTicketController = new SupportTicketController($db, $auth, $config);
 
     $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/api/index.php')), '/');
     $router = new Router($basePath === '/' ? '' : $basePath);
@@ -147,6 +147,12 @@ try {
     $router->get('/support/tickets/my', function () use ($supportTicketController): void {
         $supportTicketController->mine();
     });
+    $router->get('/support/tickets/{id}', function (array $params) use ($supportTicketController): void {
+        $supportTicketController->show($params);
+    });
+    $router->post('/support/tickets/{id}/messages', function (array $params) use ($supportTicketController): void {
+        $supportTicketController->reply($params);
+    });
 
     $router->get('/admin/users', function () use ($adminController): void {
         $adminController->users();
@@ -180,7 +186,7 @@ try {
     $rawMessage = strtolower($exception->getMessage());
     $safeError = null;
     if (in_array($sqlState, ['42P01', '42703', '42883'], true)) {
-        $safeError = 'Database schema is outdated or missing helper functions. Apply latest migrations (002 and 004) and trigger functions.';
+        $safeError = 'Database schema is outdated or missing helper functions. Apply latest migrations (002, 004, 006) and trigger functions.';
     } elseif ($sqlState === '42501') {
         $safeError = 'Database permission denied. Grant table and sequence privileges to the app user.';
     } elseif ($sqlState === '23514') {

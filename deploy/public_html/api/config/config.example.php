@@ -38,6 +38,7 @@ return [
         'samesite' => 'Lax',
     ],
     'smtp' => [
+        // Used for support-ticket notification emails via PHP mail()/sendmail.
         'enabled' => false,
         'host' => 'smtp.example.com',
         'port' => 587,
@@ -45,6 +46,7 @@ return [
         'password' => 'smtp-password',
         'from_email' => 'noreply@example.com',
         'from_name' => 'OnLedge',
+        'reply_to' => 'support@example.com',
     ],
     'ai' => [
         'enabled' => false,

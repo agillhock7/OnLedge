@@ -71,6 +71,18 @@ final class Schema
         return self::hasTable($db, 'support_tickets');
     }
 
+    public static function hasSupportTicketMessages(PDO $db): bool
+    {
+        return self::hasTable($db, 'support_ticket_messages');
+    }
+
+    public static function hasSupportThreadColumns(PDO $db): bool
+    {
+        return self::hasColumn($db, 'support_tickets', 'last_message_at')
+            && self::hasColumn($db, 'support_tickets', 'last_message_by_user_id')
+            && self::hasColumn($db, 'support_tickets', 'closed_at');
+    }
+
     public static function hasOauthTables(PDO $db): bool
     {
         return self::hasTable($db, 'oauth_identities');

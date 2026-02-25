@@ -104,6 +104,7 @@ Hard rule: the server should never need `npm`, `vite`, or Node build steps.
       003_seed_owner.example.sql
       004_oauth_identities.sql
       005_receipt_ai_fields.sql
+      006_support_threads.sql
     /public
       index.php
     /src
@@ -162,6 +163,7 @@ Required production settings in `api/config/config.php`:
 - secure session cookies (`secure`, `httponly`, `samesite`)
 - optional AI extraction provider (`ai.enabled`, `ai.openai.*`)
 - optional OAuth providers (`oauth.github.*`, `oauth.discord.*`)
+- optional support email notifications (`smtp.enabled`, `smtp.from_*`)
 
 Reference key map: `api/.env.example`
 
@@ -194,6 +196,7 @@ psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/002_admin_support.sql
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/004_oauth_identities.sql
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/005_receipt_ai_fields.sql
+psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/006_support_threads.sql
 ```
 
 If using pgAdmin query window, paste file contents directly.
@@ -206,8 +209,19 @@ Migration includes:
 - update triggers
 - extension-free UUID generation (`onledge_uuid_v4`) for shared hosts without `pgcrypto`
 - role-based users (`user`, `admin`, `owner`) and support ticket tables
+- threaded support conversations (`support_ticket_messages`) with assignment/status lifecycle
 - OAuth identity linking table (`oauth_identities`) for GitHub/Discord login
 - AI extraction fields for merchant metadata, payment details, and `line_items`
+
+Support email templates are stored in:
+
+- `api/src/Templates/Email/support_ticket_created_user.php`
+- `api/src/Templates/Email/support_ticket_created_admin.php`
+- `api/src/Templates/Email/support_ticket_reply_user.php`
+- `api/src/Templates/Email/support_ticket_reply_admin.php`
+- `api/src/Templates/Email/support_ticket_updated_user.php`
+
+When `smtp.enabled = true`, the API sends template-based notifications through PHP `mail()`/server sendmail.
 
 ## Admin Bootstrap
 
@@ -349,6 +363,8 @@ Support:
 
 - `POST /api/support/tickets`
 - `GET /api/support/tickets/my`
+- `GET /api/support/tickets/{id}`
+- `POST /api/support/tickets/{id}/messages`
 
 Admin:
 

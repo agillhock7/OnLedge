@@ -73,10 +73,15 @@
     </section>
 
     <article class="card settings-support-card" style="margin-top: 1rem">
-      <div class="inline" style="justify-content: space-between">
+      <div class="inline" style="justify-content: space-between; align-items: flex-start">
         <div>
-          <h3>Support Center</h3>
-          <p class="muted">Open tickets for account, capture, extraction, or reporting assistance.</p>
+          <h3>Support Workspace</h3>
+          <p class="muted">Threaded conversations between users and admins, with assignment and lifecycle tracking.</p>
+        </div>
+
+        <div v-if="auth.isAdmin" class="settings-support-scope">
+          <button class="ghost" type="button" :class="{ active: supportScope === 'mine' }" @click="switchSupportScope('mine')">My Tickets</button>
+          <button class="ghost" type="button" :class="{ active: supportScope === 'admin' }" @click="switchSupportScope('admin')">Admin Queue</button>
         </div>
       </div>
 
@@ -106,24 +111,184 @@
         </div>
       </form>
 
+      <div v-if="auth.isAdmin && supportScope === 'admin'" class="settings-support-filters" style="margin-top: 0.8rem">
+        <label>
+          Status
+          <select v-model="adminTicketFilters.status" @change="loadAdminTickets">
+            <option value="">All</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
+
+        <label>
+          Priority
+          <select v-model="adminTicketFilters.priority" @change="loadAdminTickets">
+            <option value="">All</option>
+            <option value="low">Low</option>
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </label>
+
+        <label>
+          Assignment
+          <select v-model="adminTicketFilters.assignment" @change="loadAdminTickets">
+            <option value="all">All</option>
+            <option value="mine">Assigned To Me</option>
+            <option value="unassigned">Unassigned</option>
+          </select>
+        </label>
+
+        <label>
+          Search
+          <input
+            v-model="adminTicketFilters.q"
+            placeholder="subject, message, reporter"
+            @keydown.enter.prevent="loadAdminTickets"
+          />
+        </label>
+
+        <div class="inline" style="align-items: end">
+          <button class="ghost" type="button" @click="loadAdminTickets">Refresh Queue</button>
+        </div>
+      </div>
+
       <p v-if="ticketNotice" class="success">{{ ticketNotice }}</p>
       <p v-if="ticketError" class="error">{{ ticketError }}</p>
 
-      <div class="settings-list" v-if="myTickets.length">
-        <article class="settings-list-item" v-for="ticket in myTickets" :key="ticket.id">
-          <div class="inline" style="justify-content: space-between; width: 100%">
-            <strong>#{{ ticket.id }} · {{ ticket.subject }}</strong>
-            <span class="pill">{{ ticket.status }}</span>
+      <div class="settings-support-layout" style="margin-top: 1rem">
+        <section class="settings-support-column">
+          <div class="inline" style="justify-content: space-between">
+            <h4 style="margin: 0">{{ supportScope === 'admin' ? 'Admin Queue' : 'My Tickets' }}</h4>
+            <span class="pill">{{ supportTickets.length }} total</span>
           </div>
-          <p class="muted settings-item-meta">
-            Priority: {{ ticket.priority }} · {{ formatDate(ticket.created_at) }}
-            <span v-if="ticket.assigned_admin_email"> · Assigned: {{ ticket.assigned_admin_email }}</span>
-          </p>
-          <p>{{ ticket.message }}</p>
-          <p v-if="ticket.admin_note" class="muted"><strong>Admin note:</strong> {{ ticket.admin_note }}</p>
-        </article>
+
+          <div class="settings-list" v-if="supportTickets.length">
+            <article
+              class="settings-list-item settings-ticket-item"
+              :class="{ active: activeTicket?.id === ticket.id }"
+              v-for="ticket in supportTickets"
+              :key="ticket.id"
+              @click="openTicket(ticket.id)"
+            >
+              <div class="inline" style="justify-content: space-between; width: 100%">
+                <strong>#{{ ticket.id }} · {{ ticket.subject }}</strong>
+                <span class="pill">{{ ticket.status }}</span>
+              </div>
+
+              <p class="muted settings-item-meta">
+                Priority: {{ ticket.priority }}
+                <span v-if="ticket.assigned_admin_email"> · Assigned: {{ ticket.assigned_admin_email }}</span>
+                <span v-if="ticket.reporter_email"> · Reporter: {{ ticket.reporter_email }}</span>
+              </p>
+
+              <p class="settings-ticket-preview">{{ ticket.last_message_preview || ticket.message || 'No message preview yet.' }}</p>
+
+              <p class="muted settings-item-meta" style="margin: 0.2rem 0 0">
+                {{ ticket.message_count || 0 }} messages
+                <span v-if="ticket.last_message_at"> · Last update {{ formatDate(ticket.last_message_at) }}</span>
+              </p>
+            </article>
+          </div>
+          <p v-else class="muted">No tickets yet.</p>
+        </section>
+
+        <section class="settings-thread-column">
+          <article class="card settings-thread-card" v-if="activeTicket">
+            <div class="inline" style="justify-content: space-between">
+              <div>
+                <h4 style="margin: 0">#{{ activeTicket.id }} · {{ activeTicket.subject }}</h4>
+                <p class="muted settings-item-meta" style="margin: 0.35rem 0 0">
+                  Created {{ formatDate(activeTicket.created_at) }}
+                  <span v-if="activeTicket.reporter_email"> · Reporter: {{ activeTicket.reporter_email }}</span>
+                </p>
+              </div>
+              <span class="pill">{{ activeTicket.status }}</span>
+            </div>
+
+            <div v-if="auth.isAdmin" class="settings-form" style="margin-top: 0.9rem">
+              <div>
+                <label>Status</label>
+                <select v-model="activeTicket.status">
+                  <option value="open">Open</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+
+              <div>
+                <label>Priority</label>
+                <select v-model="activeTicket.priority">
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              <div>
+                <label>Assigned Admin</label>
+                <select v-model="activeTicket.assigned_admin_id">
+                  <option :value="null">Unassigned</option>
+                  <option v-for="assignee in supportAssignees" :key="assignee.id" :value="assignee.id">{{ assignee.email }}</option>
+                </select>
+              </div>
+
+              <div class="settings-field-wide">
+                <label>Admin Note</label>
+                <textarea v-model="activeTicket.admin_note"></textarea>
+              </div>
+
+              <div class="settings-field-wide inline">
+                <button class="secondary" type="button" :disabled="ticketSaving" @click="saveActiveTicket">
+                  {{ ticketSaving ? 'Saving...' : 'Save Ticket Updates' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="settings-thread-list" style="margin-top: 0.95rem">
+              <div v-if="threadLoading" class="muted">Loading conversation...</div>
+
+              <article v-else class="settings-thread-message" :class="messageClasses(message)" v-for="message in activeMessages" :key="message.id">
+                <div class="inline" style="justify-content: space-between; width: 100%">
+                  <strong>
+                    {{ messageAuthorLabel(message) }}
+                    <span v-if="message.is_internal" class="pill" style="margin-left: 0.4rem">Internal</span>
+                  </strong>
+                  <span class="muted settings-item-meta">{{ formatDate(message.created_at) }}</span>
+                </div>
+                <p class="settings-thread-body">{{ message.body }}</p>
+              </article>
+            </div>
+
+            <form class="settings-thread-reply" @submit.prevent="sendReply" style="margin-top: 0.9rem">
+              <label for="thread-reply">Reply</label>
+              <textarea id="thread-reply" v-model="replyForm.message" minlength="2" maxlength="6000" required></textarea>
+
+              <label v-if="auth.isAdmin" class="settings-toggle-row" style="margin-top: 0.4rem">
+                <input type="checkbox" v-model="replyForm.is_internal" />
+                <span>Internal note (hidden from user)</span>
+              </label>
+
+              <div class="inline" style="margin-top: 0.55rem">
+                <button class="primary" :disabled="replySubmitting">
+                  {{ replySubmitting ? 'Sending...' : 'Send Reply' }}
+                </button>
+              </div>
+            </form>
+          </article>
+
+          <article v-else class="card settings-thread-card settings-thread-empty">
+            <h4>Select a ticket</h4>
+            <p class="muted" style="margin: 0">Choose a ticket from the list to view and continue the thread.</p>
+          </article>
+        </section>
       </div>
-      <p v-else class="muted">No tickets yet.</p>
     </article>
 
     <section v-if="auth.isAdmin" class="settings-admin-stack" style="margin-top: 1rem">
@@ -206,56 +371,6 @@
           </article>
         </div>
       </article>
-
-      <article class="card">
-        <h3>Admin: Support Queue</h3>
-        <p class="muted">Manage ticket triage, status, and resolution notes.</p>
-
-        <div class="settings-list" v-if="adminTickets.length">
-          <article class="settings-list-item" v-for="ticket in adminTickets" :key="ticket.id">
-            <div class="inline" style="justify-content: space-between; width: 100%">
-              <strong>#{{ ticket.id }} · {{ ticket.subject }}</strong>
-              <span class="pill">{{ ticket.status }}</span>
-            </div>
-            <p class="muted settings-item-meta">
-              Reporter: {{ ticket.reporter_email || 'unknown' }} · Priority: {{ ticket.priority }}
-            </p>
-            <p>{{ ticket.message }}</p>
-
-            <div class="settings-form" style="margin-top: 0.8rem">
-              <div>
-                <label>Status</label>
-                <select v-model="ticket.status">
-                  <option value="open">Open</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </div>
-
-              <div>
-                <label>Priority</label>
-                <select v-model="ticket.priority">
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-
-              <div class="settings-field-wide">
-                <label>Admin Note</label>
-                <textarea v-model="ticket.admin_note"></textarea>
-              </div>
-
-              <div class="inline" style="align-items: end">
-                <button class="secondary" @click.prevent="saveAdminTicket(ticket)">Save Ticket</button>
-              </div>
-            </div>
-          </article>
-        </div>
-        <p v-else class="muted">No support tickets in queue.</p>
-      </article>
     </section>
   </section>
 </template>
@@ -267,6 +382,8 @@ import { apiGet, apiPost, apiPut } from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
 
 type Role = 'user' | 'admin' | 'owner';
+type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 type ManagedUser = {
   id: number;
@@ -284,12 +401,30 @@ type SupportTicket = {
   user_id: number;
   subject: string;
   message: string;
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  status: TicketStatus;
+  priority: TicketPriority;
   assigned_admin_id?: number | null;
   assigned_admin_email?: string | null;
   reporter_email?: string | null;
   admin_note?: string | null;
+  message_count?: number;
+  last_message_at?: string | null;
+  last_message_preview?: string | null;
+  last_message_by_user_id?: number | null;
+  last_message_author_email?: string | null;
+  last_message_author_role?: Role | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type SupportTicketMessage = {
+  id: number;
+  ticket_id: number;
+  author_user_id: number;
+  author_email?: string | null;
+  author_role?: Role;
+  body: string;
+  is_internal: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -299,14 +434,35 @@ const PREFERENCE_KEY = 'onledge.settings.preferences.v1';
 const auth = useAuthStore();
 
 const ticketSubmitting = ref(false);
+const ticketSaving = ref(false);
 const ticketError = ref('');
 const ticketNotice = ref('');
+const ticketLoading = ref(false);
+const threadLoading = ref(false);
+const replySubmitting = ref(false);
+
 const myTickets = ref<SupportTicket[]>([]);
 const adminTickets = ref<SupportTicket[]>([]);
+const activeTicket = ref<SupportTicket | null>(null);
+const activeMessages = ref<SupportTicketMessage[]>([]);
+
 const users = ref<ManagedUser[]>([]);
 const userSubmitting = ref(false);
 const userError = ref('');
 const preferenceNotice = ref('');
+
+const supportScope = ref<'mine' | 'admin'>('mine');
+const adminTicketFilters = reactive({
+  status: '',
+  priority: '',
+  assignment: 'all',
+  q: ''
+});
+
+const replyForm = reactive({
+  message: '',
+  is_internal: false
+});
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY'];
 
@@ -320,7 +476,7 @@ const preferences = reactive({
 const ticketForm = reactive({
   subject: '',
   message: '',
-  priority: 'normal' as SupportTicket['priority']
+  priority: 'normal' as TicketPriority
 });
 
 const newUser = reactive({
@@ -332,12 +488,67 @@ const newUser = reactive({
 
 const isAdmin = computed(() => auth.isAdmin);
 
-function formatDate(value: string): string {
+const supportTickets = computed(() => (supportScope.value === 'admin' && auth.isAdmin ? adminTickets.value : myTickets.value));
+
+const supportAssignees = computed(() =>
+  users.value
+    .filter((user) => user.is_active && (user.role === 'admin' || user.role === 'owner'))
+    .sort((a, b) => a.email.localeCompare(b.email))
+);
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) {
+    return '-';
+  }
+
   try {
     return new Date(value).toLocaleString();
   } catch {
     return value;
   }
+}
+
+function switchSupportScope(scope: 'mine' | 'admin'): void {
+  supportScope.value = scope;
+  if (scope === 'admin' && auth.isAdmin) {
+    void loadAdminTickets();
+  }
+}
+
+function messageAuthorLabel(message: SupportTicketMessage): string {
+  const role = message.author_role || 'user';
+  const base = message.author_email || `User #${message.author_user_id}`;
+  if (auth.user && message.author_user_id === auth.user.id) {
+    return `You (${role})`;
+  }
+  return `${base} (${role})`;
+}
+
+function messageClasses(message: SupportTicketMessage): string {
+  const own = auth.user ? message.author_user_id === auth.user.id : false;
+  if (message.is_internal) {
+    return own ? 'is-own is-internal' : 'is-internal';
+  }
+  return own ? 'is-own' : '';
+}
+
+function syncActiveTicketSummary(): void {
+  if (!activeTicket.value) {
+    return;
+  }
+
+  const ticketId = activeTicket.value.id;
+  const fromMine = myTickets.value.find((ticket) => ticket.id === ticketId);
+  const fromAdmin = adminTickets.value.find((ticket) => ticket.id === ticketId);
+  const latest = fromAdmin || fromMine;
+  if (!latest) {
+    return;
+  }
+
+  activeTicket.value = {
+    ...activeTicket.value,
+    ...latest
+  };
 }
 
 function canEditRole(user: ManagedUser): boolean {
@@ -407,22 +618,61 @@ function savePreferences(): void {
 }
 
 async function loadMyTickets() {
-  const response = await apiGet<{ items: SupportTicket[] }>('/support/tickets/my');
-  myTickets.value = response.items;
+  ticketLoading.value = true;
+  try {
+    const response = await apiGet<{ items: SupportTicket[] }>('/support/tickets/my');
+    myTickets.value = response.items;
+    syncActiveTicketSummary();
+  } finally {
+    ticketLoading.value = false;
+  }
 }
 
-async function loadAdminData() {
+async function loadAdminTickets() {
   if (!isAdmin.value) {
     return;
   }
 
-  const [usersResponse, ticketsResponse] = await Promise.all([
-    apiGet<{ items: ManagedUser[] }>('/admin/users'),
-    apiGet<{ items: SupportTicket[] }>('/admin/tickets')
-  ]);
+  ticketLoading.value = true;
+  try {
+    const params = new URLSearchParams();
+    if (adminTicketFilters.status !== '') {
+      params.set('status', adminTicketFilters.status);
+    }
+    if (adminTicketFilters.priority !== '') {
+      params.set('priority', adminTicketFilters.priority);
+    }
+    if (adminTicketFilters.assignment !== '') {
+      params.set('assignment', adminTicketFilters.assignment);
+    }
+    if (adminTicketFilters.q.trim() !== '') {
+      params.set('q', adminTicketFilters.q.trim());
+    }
 
-  users.value = usersResponse.items;
-  adminTickets.value = ticketsResponse.items;
+    const suffix = params.toString() !== '' ? `?${params.toString()}` : '';
+    const response = await apiGet<{ items: SupportTicket[] }>(`/admin/tickets${suffix}`);
+    adminTickets.value = response.items;
+    syncActiveTicketSummary();
+  } finally {
+    ticketLoading.value = false;
+  }
+}
+
+async function openTicket(ticketId: number) {
+  threadLoading.value = true;
+  ticketError.value = '';
+
+  try {
+    const response = await apiGet<{ item: SupportTicket; messages: SupportTicketMessage[] }>(`/support/tickets/${ticketId}`);
+    activeTicket.value = response.item;
+    activeMessages.value = response.messages;
+    replyForm.message = '';
+    replyForm.is_internal = false;
+  } catch (error) {
+    ticketError.value = error instanceof Error ? error.message : 'Unable to open ticket thread';
+  } finally {
+    threadLoading.value = false;
+  }
 }
 
 async function createTicket() {
@@ -431,7 +681,7 @@ async function createTicket() {
   ticketNotice.value = '';
 
   try {
-    await apiPost('/support/tickets', {
+    const response = await apiPost<{ item: SupportTicket; messages: SupportTicketMessage[] }>('/support/tickets', {
       subject: ticketForm.subject,
       message: ticketForm.message,
       priority: ticketForm.priority
@@ -440,16 +690,103 @@ async function createTicket() {
     ticketForm.subject = '';
     ticketForm.message = '';
     ticketForm.priority = 'normal';
-    ticketNotice.value = 'Support ticket created.';
-    await loadMyTickets();
 
-    if (isAdmin.value) {
-      await loadAdminData();
+    ticketNotice.value = 'Support ticket created.';
+
+    await loadMyTickets();
+    if (isAdmin.value && supportScope.value === 'admin') {
+      await loadAdminTickets();
+    }
+
+    if (response.item) {
+      activeTicket.value = response.item;
+      activeMessages.value = response.messages || [];
+      supportScope.value = 'mine';
     }
   } catch (error) {
     ticketError.value = error instanceof Error ? error.message : 'Unable to create ticket';
   } finally {
     ticketSubmitting.value = false;
+  }
+}
+
+async function sendReply() {
+  if (!activeTicket.value) {
+    return;
+  }
+
+  replySubmitting.value = true;
+  ticketError.value = '';
+  ticketNotice.value = '';
+
+  try {
+    const response = await apiPost<{ item: SupportTicket; messages: SupportTicketMessage[] }>(
+      `/support/tickets/${activeTicket.value.id}/messages`,
+      {
+        message: replyForm.message,
+        is_internal: auth.isAdmin ? replyForm.is_internal : false
+      }
+    );
+
+    activeTicket.value = response.item;
+    activeMessages.value = response.messages;
+
+    replyForm.message = '';
+    replyForm.is_internal = false;
+
+    await loadMyTickets();
+    if (isAdmin.value) {
+      await loadAdminTickets();
+    }
+
+    ticketNotice.value = 'Reply sent.';
+  } catch (error) {
+    ticketError.value = error instanceof Error ? error.message : 'Unable to send reply';
+  } finally {
+    replySubmitting.value = false;
+  }
+}
+
+async function saveActiveTicket() {
+  if (!activeTicket.value || !auth.isAdmin) {
+    return;
+  }
+
+  ticketSaving.value = true;
+  ticketError.value = '';
+  ticketNotice.value = '';
+
+  try {
+    const response = await apiPut<{ item: SupportTicket }>(`/admin/tickets/${activeTicket.value.id}`, {
+      status: activeTicket.value.status,
+      priority: activeTicket.value.priority,
+      assigned_admin_id: activeTicket.value.assigned_admin_id ?? null,
+      admin_note: activeTicket.value.admin_note ?? ''
+    });
+
+    activeTicket.value = response.item;
+
+    await loadMyTickets();
+    await loadAdminTickets();
+
+    ticketNotice.value = `Ticket #${activeTicket.value.id} updated.`;
+  } catch (error) {
+    ticketError.value = error instanceof Error ? error.message : 'Unable to update ticket';
+  } finally {
+    ticketSaving.value = false;
+  }
+}
+
+async function loadAdminData() {
+  if (!isAdmin.value) {
+    return;
+  }
+
+  const usersResponse = await apiGet<{ items: ManagedUser[] }>('/admin/users');
+  users.value = usersResponse.items;
+
+  if (supportScope.value === 'admin') {
+    await loadAdminTickets();
   }
 }
 
@@ -496,22 +833,6 @@ async function saveUser(user: ManagedUser) {
     await loadAdminData();
   } catch (error) {
     userError.value = error instanceof Error ? error.message : 'Unable to update user';
-  }
-}
-
-async function saveAdminTicket(ticket: SupportTicket) {
-  try {
-    await apiPut(`/admin/tickets/${ticket.id}`, {
-      status: ticket.status,
-      priority: ticket.priority,
-      admin_note: ticket.admin_note ?? ''
-    });
-
-    await loadAdminData();
-    await loadMyTickets();
-    ticketNotice.value = `Ticket #${ticket.id} updated.`;
-  } catch (error) {
-    ticketError.value = error instanceof Error ? error.message : 'Unable to update ticket';
   }
 }
 

@@ -865,6 +865,123 @@ button.ghost {
   font-size: 0.82rem;
 }
 
+.settings-support-scope {
+  display: inline-flex;
+  gap: 0.45rem;
+}
+
+.settings-support-scope button {
+  min-height: 34px;
+  min-width: 0;
+  padding: 0.45rem 0.66rem;
+  font-size: 0.8rem;
+}
+
+.settings-support-scope button.active {
+  border-color: #7baeb5;
+  background: #e4f2f1;
+  color: #154e5d;
+}
+
+.settings-support-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.68rem;
+  align-items: end;
+}
+
+.settings-support-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.4fr);
+  gap: 0.9rem;
+}
+
+.settings-support-column {
+  display: grid;
+  gap: 0.65rem;
+  align-content: start;
+}
+
+.settings-thread-column {
+  min-width: 0;
+}
+
+.settings-ticket-item {
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.settings-ticket-item:hover {
+  border-color: #9cbebb;
+}
+
+.settings-ticket-item.active {
+  border-color: #7baeb5;
+  background: #f3fbf9;
+  box-shadow: 0 8px 20px rgba(15, 56, 66, 0.08);
+}
+
+.settings-ticket-preview {
+  margin: 0.45rem 0 0;
+  color: #244651;
+  line-height: 1.35;
+}
+
+.settings-thread-card {
+  display: grid;
+  gap: 0.45rem;
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+.settings-thread-list {
+  display: grid;
+  gap: 0.55rem;
+  max-height: 50vh;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.settings-thread-message {
+  border: 1px solid #d5e4e1;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.62rem 0.7rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.settings-thread-message.is-own {
+  border-color: #8dbac2;
+  background: #ecf7f8;
+}
+
+.settings-thread-message.is-internal {
+  border-color: #d7c18f;
+  background: #fdf6e8;
+}
+
+.settings-thread-message.is-own.is-internal {
+  border-color: #c8b37c;
+  background: #fbf0d8;
+}
+
+.settings-thread-body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.settings-thread-reply {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.settings-thread-empty {
+  min-height: 220px;
+  place-content: center;
+}
+
 .settings-admin-stack {
   display: grid;
   gap: 1rem;
@@ -2509,6 +2626,18 @@ button.ghost {
 
   .settings-account-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-support-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-support-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-thread-list {
+    max-height: 56vh;
   }
 
   .settings-toggle-row,
