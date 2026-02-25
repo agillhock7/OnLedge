@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/_branding.php';
+
 $ticket = is_array($data['ticket'] ?? null) ? $data['ticket'] : [];
 $message = is_array($data['message'] ?? null) ? $data['message'] : [];
 $actor = is_array($data['actor'] ?? null) ? $data['actor'] : [];
@@ -27,27 +29,29 @@ if ($ticketUrl !== '') {
 }
 $text .= "\n- OnLedge Support";
 
-$safeSubject = htmlspecialchars($subjectLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$safeReporter = htmlspecialchars($reporter, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$safeActor = htmlspecialchars($actorEmail !== '' ? $actorEmail : 'user', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$safeBody = nl2br(htmlspecialchars($body !== '' ? $body : '(no message content)', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
-$safeUrl = htmlspecialchars($ticketUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+$safeSubject = onledge_email_escape($subjectLine);
+$safeReporter = onledge_email_escape($reporter);
+$safeActor = onledge_email_escape($actorEmail !== '' ? $actorEmail : 'user');
+$safeBody = nl2br(onledge_email_escape($body !== '' ? $body : '(no message content)'));
 
-$html = <<<HTML
-<h2>Customer Reply on Ticket #{$ticketId}</h2>
-<p><strong>Subject:</strong> {$safeSubject}<br /><strong>Reporter:</strong> {$safeReporter}<br /><strong>From:</strong> {$safeActor}</p>
-<blockquote style="padding:10px;border-left:4px solid #d4e1df;background:#f8fbf9;">{$safeBody}</blockquote>
-HTML;
+$bodyHtml = "<p style=\"margin:0 0 10px;font-size:14px;line-height:1.5;\">A customer posted a new reply.</p>";
+$bodyHtml .= "<p style=\"margin:0 0 6px;\"><strong>Subject:</strong> {$safeSubject}</p>";
+$bodyHtml .= "<p style=\"margin:0 0 6px;\"><strong>Reporter:</strong> {$safeReporter}</p>";
+$bodyHtml .= "<p style=\"margin:0 0 10px;\"><strong>From:</strong> {$safeActor}</p>";
+$bodyHtml .= "<blockquote style=\"margin:0;padding:12px;border-left:4px solid #8dbac2;background:#f2f9fa;border-radius:8px;\">{$safeBody}</blockquote>";
 
-if ($safeUrl !== '') {
-    $html .= "<p><a href=\"{$safeUrl}\">Open support queue</a></p>";
-}
-
-$html .= '<p>- OnLedge Support</p>';
+$html = onledge_email_layout(
+    'Customer Reply Received',
+    "Ticket #{$ticketId} needs attention.",
+    $bodyHtml,
+    $appUrl,
+    $ticketUrl !== '' ? 'Open Support Queue' : '',
+    $ticketUrl,
+    ['preview_text' => "Customer replied on ticket #{$ticketId}"]
+);
 
 return [
     'subject' => $subject,
     'text' => $text,
     'html' => $html,
 ];
-

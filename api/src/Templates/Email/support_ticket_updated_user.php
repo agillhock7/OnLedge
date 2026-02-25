@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/_branding.php';
+
 $ticket = is_array($data['ticket'] ?? null) ? $data['ticket'] : [];
 $actor = is_array($data['actor'] ?? null) ? $data['actor'] : [];
 $changedFields = is_array($data['changed_fields'] ?? null) ? $data['changed_fields'] : [];
@@ -34,32 +36,37 @@ if ($ticketUrl !== '') {
 }
 $text .= "\n- OnLedge Support";
 
-$safeSubject = htmlspecialchars($subjectLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$safeActor = htmlspecialchars($actorEmail !== '' ? $actorEmail : 'Support team', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$safeChanges = htmlspecialchars($changes, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$safeStatus = htmlspecialchars($status, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$safePriority = htmlspecialchars($priority, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$safeAssignee = htmlspecialchars($assignee, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$safeUrl = htmlspecialchars($ticketUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+$safeSubject = onledge_email_escape($subjectLine);
+$safeActor = onledge_email_escape($actorEmail !== '' ? $actorEmail : 'Support team');
+$safeChanges = onledge_email_escape($changes);
+$safeStatus = onledge_email_escape($status);
+$safePriority = onledge_email_escape($priority);
+$safeAssignee = onledge_email_escape($assignee);
 
-$html = <<<HTML
-<h2>Support Ticket #{$ticketId} Updated</h2>
-<p><strong>Subject:</strong> {$safeSubject}<br /><strong>Updated by:</strong> {$safeActor}<br /><strong>Changed:</strong> {$safeChanges}</p>
-<p><strong>Status:</strong> {$safeStatus}<br /><strong>Priority:</strong> {$safePriority}</p>
-HTML;
-
+$bodyHtml = "<p style=\"margin:0 0 10px;font-size:14px;line-height:1.5;\">Your ticket details were updated by support.</p>";
+$bodyHtml .= "<div style=\"border:1px solid #d6e3e1;border-radius:12px;padding:12px;background:#f8fbfa;\">";
+$bodyHtml .= "<p style=\"margin:0 0 8px;\"><strong>Subject:</strong> {$safeSubject}</p>";
+$bodyHtml .= "<p style=\"margin:0 0 8px;\"><strong>Updated by:</strong> {$safeActor}</p>";
+$bodyHtml .= "<p style=\"margin:0 0 8px;\"><strong>Changed:</strong> {$safeChanges}</p>";
+$bodyHtml .= "<p style=\"margin:0 0 8px;\"><strong>Status:</strong> {$safeStatus}</p>";
+$bodyHtml .= "<p style=\"margin:0;\"><strong>Priority:</strong> {$safePriority}</p>";
 if ($safeAssignee !== '') {
-    $html .= "<p><strong>Assigned to:</strong> {$safeAssignee}</p>";
+    $bodyHtml .= "<p style=\"margin:8px 0 0;\"><strong>Assigned to:</strong> {$safeAssignee}</p>";
 }
-if ($safeUrl !== '') {
-    $html .= "<p><a href=\"{$safeUrl}\">Open ticket in OnLedge</a></p>";
-}
+$bodyHtml .= '</div>';
 
-$html .= '<p>- OnLedge Support</p>';
+$html = onledge_email_layout(
+    'Support Ticket Updated',
+    "Ticket #{$ticketId} has updated details.",
+    $bodyHtml,
+    $appUrl,
+    $ticketUrl !== '' ? 'View Ticket' : '',
+    $ticketUrl,
+    ['preview_text' => "Ticket #{$ticketId} updated"]
+);
 
 return [
     'subject' => $subject,
     'text' => $text,
     'html' => $html,
 ];
-

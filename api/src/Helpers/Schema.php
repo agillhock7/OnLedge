@@ -87,4 +87,12 @@ final class Schema
     {
         return self::hasTable($db, 'oauth_identities');
     }
+
+    public static function hasUserNotificationSettings(PDO $db): bool
+    {
+        return self::hasTable($db, 'user_notification_settings')
+            && self::hasColumn($db, 'user_notification_settings', 'weekly_report_enabled')
+            && self::hasColumn($db, 'user_notification_settings', 'weekly_report_last_sent_at')
+            && self::hasColumn($db, 'user_notification_settings', 'welcome_email_sent_at');
+    }
 }

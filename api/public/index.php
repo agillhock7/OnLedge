@@ -6,6 +6,7 @@ use App\Auth\SessionAuth;
 use App\Controllers\AdminController;
 use App\Controllers\AuthController;
 use App\Controllers\ExportController;
+use App\Controllers\NotificationController;
 use App\Controllers\ReceiptController;
 use App\Controllers\ReportsController;
 use App\Controllers\RuleController;
@@ -58,6 +59,7 @@ try {
     $searchController = new SearchController($db, $auth);
     $exportController = new ExportController($db, $auth);
     $reportsController = new ReportsController($db, $auth, $config);
+    $notificationController = new NotificationController($db, $auth, $config);
     $adminController = new AdminController($db, $auth);
     $supportTicketController = new SupportTicketController($db, $auth, $config);
 
@@ -140,6 +142,12 @@ try {
     $router->post('/reports/ai-review', function () use ($reportsController): void {
         $reportsController->aiReview();
     });
+    $router->get('/notifications/preferences', function () use ($notificationController): void {
+        $notificationController->preferences();
+    });
+    $router->put('/notifications/preferences', function () use ($notificationController): void {
+        $notificationController->updatePreferences();
+    });
 
     $router->post('/support/tickets', function () use ($supportTicketController): void {
         $supportTicketController->create();
@@ -186,7 +194,7 @@ try {
     $rawMessage = strtolower($exception->getMessage());
     $safeError = null;
     if (in_array($sqlState, ['42P01', '42703', '42883'], true)) {
-        $safeError = 'Database schema is outdated or missing helper functions. Apply latest migrations (002, 004, 006) and trigger functions.';
+        $safeError = 'Database schema is outdated or missing helper functions. Apply latest migrations (002, 004, 006, 007) and trigger functions.';
     } elseif ($sqlState === '42501') {
         $safeError = 'Database permission denied. Grant table and sequence privileges to the app user.';
     } elseif ($sqlState === '23514') {

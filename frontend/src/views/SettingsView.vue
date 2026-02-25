@@ -70,6 +70,33 @@
         </div>
         <p v-if="preferenceNotice" class="success" style="margin: 0">{{ preferenceNotice }}</p>
       </article>
+
+      <article class="card settings-preference-card">
+        <h3>Email Notifications</h3>
+        <p class="muted">Manage automated report delivery and account notification preferences.</p>
+
+        <div class="settings-preference-grid">
+          <label class="settings-toggle-row">
+            <input type="checkbox" v-model="emailPrefs.weekly_report_enabled" />
+            <span>Weekly spending report via email</span>
+          </label>
+        </div>
+
+        <p class="muted" style="margin: 0">
+          Weekly reports are enabled by default for new accounts.
+          <span v-if="emailPrefs.weekly_report_last_sent_at">
+            Last sent: {{ formatDate(emailPrefs.weekly_report_last_sent_at) }}.
+          </span>
+        </p>
+
+        <div class="inline">
+          <button class="primary" type="button" :disabled="emailPrefsSaving" @click="saveEmailPreferences">
+            {{ emailPrefsSaving ? 'Saving...' : 'Save Email Preferences' }}
+          </button>
+        </div>
+        <p v-if="emailPrefsNotice" class="success" style="margin: 0">{{ emailPrefsNotice }}</p>
+        <p v-if="emailPrefsError" class="error" style="margin: 0">{{ emailPrefsError }}</p>
+      </article>
     </section>
 
     <article class="card settings-support-card" style="margin-top: 1rem">
@@ -429,6 +456,15 @@ type SupportTicketMessage = {
   updated_at: string;
 };
 
+type EmailPreferences = {
+  user_id: number;
+  weekly_report_enabled: boolean;
+  weekly_report_last_sent_at: string;
+  welcome_email_sent_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 const PREFERENCE_KEY = 'onledge.settings.preferences.v1';
 
 const auth = useAuthStore();
@@ -450,6 +486,9 @@ const users = ref<ManagedUser[]>([]);
 const userSubmitting = ref(false);
 const userError = ref('');
 const preferenceNotice = ref('');
+const emailPrefsNotice = ref('');
+const emailPrefsError = ref('');
+const emailPrefsSaving = ref(false);
 
 const supportScope = ref<'mine' | 'admin'>('mine');
 const adminTicketFilters = reactive({
@@ -471,6 +510,15 @@ const preferences = reactive({
   autoProcessAfterCapture: false,
   compactDensity: false,
   showHints: true
+});
+
+const emailPrefs = reactive<EmailPreferences>({
+  user_id: 0,
+  weekly_report_enabled: true,
+  weekly_report_last_sent_at: '',
+  welcome_email_sent_at: '',
+  created_at: '',
+  updated_at: ''
 });
 
 const ticketForm = reactive({
@@ -615,6 +663,33 @@ function savePreferences(): void {
 
   localStorage.setItem(PREFERENCE_KEY, JSON.stringify(preferences));
   preferenceNotice.value = 'Preferences saved for this device.';
+}
+
+async function loadEmailPreferences() {
+  try {
+    const response = await apiGet<{ item: EmailPreferences }>('/notifications/preferences');
+    Object.assign(emailPrefs, response.item);
+  } catch (error) {
+    emailPrefsError.value = error instanceof Error ? error.message : 'Unable to load email notification preferences';
+  }
+}
+
+async function saveEmailPreferences() {
+  emailPrefsSaving.value = true;
+  emailPrefsError.value = '';
+  emailPrefsNotice.value = '';
+
+  try {
+    const response = await apiPut<{ item: EmailPreferences }>('/notifications/preferences', {
+      weekly_report_enabled: emailPrefs.weekly_report_enabled
+    });
+    Object.assign(emailPrefs, response.item);
+    emailPrefsNotice.value = 'Email notification preferences saved.';
+  } catch (error) {
+    emailPrefsError.value = error instanceof Error ? error.message : 'Unable to update email preferences';
+  } finally {
+    emailPrefsSaving.value = false;
+  }
 }
 
 async function loadMyTickets() {
@@ -838,6 +913,8 @@ async function saveUser(user: ManagedUser) {
 
 onMounted(async () => {
   loadPreferences();
+
+  await loadEmailPreferences();
 
   try {
     await loadMyTickets();

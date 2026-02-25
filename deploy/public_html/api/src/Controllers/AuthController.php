@@ -10,8 +10,10 @@ use App\Helpers\HttpException;
 use App\Helpers\Request;
 use App\Helpers\Response;
 use App\Helpers\Schema;
+use App\Services\UserNotificationService;
 use PDO;
 use PDOException;
+use Throwable;
 
 final class AuthController
 {
@@ -64,9 +66,11 @@ final class AuthController
         $user = $this->findUserById($userId);
 
         $this->auth->login($userId);
+        $normalized = $this->normalizeAuthUser($user);
+        $this->triggerWelcomeEmail($normalized);
 
         Response::json([
-            'user' => $this->normalizeAuthUser($user),
+            'user' => $normalized,
         ], 201);
     }
 
@@ -88,6 +92,7 @@ final class AuthController
         }
 
         $this->auth->login((int) $normalized['id']);
+        $this->triggerWeeklyDigest($normalized);
 
         Response::json([
             'user' => $normalized,
@@ -151,6 +156,7 @@ final class AuthController
             $this->auth->logout();
             throw new HttpException('Account is disabled', 403);
         }
+        $this->triggerWeeklyDigest($normalized);
 
         Response::json([
             'user' => $normalized,
@@ -228,7 +234,8 @@ final class AuthController
 
         $token = $this->exchangeOauthToken($provider, $cfg, $code);
         $profile = $this->fetchOauthProfile($provider, $token);
-        $user = $this->findOrCreateOauthUser($provider, $profile);
+        $oauth = $this->findOrCreateOauthUser($provider, $profile);
+        $user = $oauth['user'];
 
         $normalized = $this->normalizeAuthUser($user);
         if (!$normalized['is_active']) {
@@ -236,6 +243,10 @@ final class AuthController
         }
 
         $this->auth->login((int) $normalized['id']);
+        if ($oauth['is_new']) {
+            $this->triggerWelcomeEmail($normalized);
+        }
+        $this->triggerWeeklyDigest($normalized);
 
         $appUrl = rtrim((string) (($this->config['app']['url'] ?? '')), '/');
         $redirect = $appUrl !== '' ? ($appUrl . '/app/dashboard') : '/app/dashboard';
@@ -486,10 +497,11 @@ final class AuthController
     }
 
     /** @param array{provider_user_id: string, email: string} $profile
-     *  @return array<string, mixed>
+     *  @return array{user: array<string, mixed>, is_new: bool}
      */
     private function findOrCreateOauthUser(string $provider, array $profile): array
     {
+        $isNew = false;
         $identityStmt = $this->db->prepare(
             'SELECT user_id
              FROM oauth_identities
@@ -505,7 +517,7 @@ final class AuthController
         if ($identity && isset($identity['user_id'])) {
             $user = $this->findUserById((int) $identity['user_id']);
             if ($user) {
-                return $user;
+                return ['user' => $user, 'is_new' => false];
             }
         }
 
@@ -524,6 +536,7 @@ final class AuthController
             }
 
             $user = $this->findUserById($userId);
+            $isNew = true;
         }
 
         if (!$user) {
@@ -542,7 +555,46 @@ final class AuthController
             ':user_id' => (int) $user['id'],
         ]);
 
-        return $user;
+        return ['user' => $user, 'is_new' => $isNew];
+    }
+
+    /** @param array<string, mixed> $normalizedUser */
+    private function triggerWelcomeEmail(array $normalizedUser): void
+    {
+        $service = $this->notificationService();
+        if ($service === null) {
+            return;
+        }
+
+        try {
+            $service->sendWelcomeEmailIfPending($normalizedUser);
+        } catch (Throwable $exception) {
+            error_log('[OnLedge][Notifications] welcome email failed: ' . $exception->getMessage());
+        }
+    }
+
+    /** @param array<string, mixed> $normalizedUser */
+    private function triggerWeeklyDigest(array $normalizedUser): void
+    {
+        $service = $this->notificationService();
+        if ($service === null) {
+            return;
+        }
+
+        try {
+            $service->sendWeeklyDigestIfDue($normalizedUser);
+        } catch (Throwable $exception) {
+            error_log('[OnLedge][Notifications] weekly digest failed: ' . $exception->getMessage());
+        }
+    }
+
+    private function notificationService(): ?UserNotificationService
+    {
+        if (!Schema::hasUserNotificationSettings($this->db)) {
+            return null;
+        }
+
+        return new UserNotificationService($this->db, $this->config);
     }
 
     /**

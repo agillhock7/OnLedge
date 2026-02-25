@@ -49,6 +49,7 @@
 - Apply explainable rules during processing
 - Export receipts to CSV for reporting/accounting workflows
 - Visual reporting dashboard with trends, category/merchant insights, and AI-generated executive reviews
+- Threaded support workspace with email notifications
 
 ## Product Preview
 
@@ -105,6 +106,7 @@ Hard rule: the server should never need `npm`, `vite`, or Node build steps.
       004_oauth_identities.sql
       005_receipt_ai_fields.sql
       006_support_threads.sql
+      007_user_notifications.sql
     /public
       index.php
     /src
@@ -197,6 +199,7 @@ psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/004_oauth_identities.sql
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/005_receipt_ai_fields.sql
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/006_support_threads.sql
+psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/007_user_notifications.sql
 ```
 
 If using pgAdmin query window, paste file contents directly.
@@ -212,6 +215,7 @@ Migration includes:
 - threaded support conversations (`support_ticket_messages`) with assignment/status lifecycle
 - OAuth identity linking table (`oauth_identities`) for GitHub/Discord login
 - AI extraction fields for merchant metadata, payment details, and `line_items`
+- user notification settings for weekly email reports and welcome-email tracking
 
 Support email templates are stored in:
 
@@ -220,8 +224,11 @@ Support email templates are stored in:
 - `api/src/Templates/Email/support_ticket_reply_user.php`
 - `api/src/Templates/Email/support_ticket_reply_admin.php`
 - `api/src/Templates/Email/support_ticket_updated_user.php`
+- `api/src/Templates/Email/welcome_user.php`
+- `api/src/Templates/Email/weekly_spending_report.php`
 
 When `smtp.enabled = true`, the API sends template-based notifications through PHP `mail()`/server sendmail.
+Weekly spending reports are enabled by default for new users and can be toggled in **Settings**.
 
 ## Admin Bootstrap
 
@@ -358,6 +365,8 @@ Rules / Search / Export:
 - `GET /api/export/csv?from=YYYY-MM-DD&to=YYYY-MM-DD`
 - `GET /api/reports/overview?from=YYYY-MM-DD&to=YYYY-MM-DD`
 - `POST /api/reports/ai-review`
+- `GET /api/notifications/preferences`
+- `PUT /api/notifications/preferences`
 
 Support:
 
