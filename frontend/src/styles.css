@@ -530,6 +530,19 @@ button.ghost {
   margin-top: 0.95rem;
 }
 
+.capture-launch {
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  text-align: center;
+  padding: 0.9rem 0.2rem 0.35rem;
+}
+
+.capture-launch-copy {
+  margin: 0;
+  max-width: 30rem;
+}
+
 .capture-primary {
   min-width: 170px;
 }

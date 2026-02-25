@@ -1,7 +1,7 @@
 <template>
   <section class="page capture-page">
     <h1>Scan Receipt</h1>
-    <p class="muted">Tap capture, choose camera or gallery, adjust edges, then upload.</p>
+    <p class="muted">Capture or choose a receipt photo, adjust edges, then upload.</p>
 
     <ol class="capture-steps" aria-label="Receipt capture steps">
       <li class="capture-step" :class="{ active: !previewUrl }">1. Capture</li>
@@ -10,13 +10,15 @@
     </ol>
 
     <div class="card camera-capture" style="margin-top: 1rem">
-      <div class="camera-stage" :class="{ 'is-preview': !!previewUrl, 'is-empty': !previewUrl }">
-        <div v-if="!previewUrl" class="capture-empty">
-          <p class="capture-empty-title">Ready to capture</p>
-          <p class="capture-empty-copy">Use your device camera or choose an existing receipt photo.</p>
-        </div>
+      <div v-if="!previewUrl" class="capture-launch">
+        <button class="primary capture-primary" :disabled="submitting || processingCapture" @click="openNativeCapture">
+          Capture Receipt
+        </button>
+        <p class="muted capture-launch-copy">This opens your device's native camera/photo picker.</p>
+      </div>
 
-        <div v-else class="preview-editor-wrap">
+      <div v-else class="camera-stage is-preview">
+        <div class="preview-editor-wrap">
           <div class="preview-editor">
             <img ref="previewImageEl" :src="previewUrl" alt="Receipt preview" class="camera-feed camera-feed-preview" />
 
@@ -41,20 +43,14 @@
 
       <p class="muted capture-hint">
         {{ previewUrl
-          ? 'Drag the corners to hug the receipt edges, then upload the selected area.'
-          : 'Tap Capture Receipt to open your device options.' }}
+          ? 'Drag corners to match the receipt edges, then upload selected area.'
+          : 'Tap Capture Receipt to continue.' }}
       </p>
 
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="message" class="success">{{ message }}</p>
 
-      <div class="capture-actions" v-if="!previewUrl">
-        <button class="primary capture-primary" :disabled="submitting || processingCapture" @click="openNativePicker">
-          Capture Receipt
-        </button>
-      </div>
-
-      <div class="capture-actions" v-else>
+      <div class="capture-actions" v-if="previewUrl">
         <button type="button" class="ghost" :disabled="submitting || processingCapture" @click="clearSelection">Choose Another</button>
         <button type="button" class="ghost" :disabled="submitting || processingCapture" @click="applyAutoEdges">Auto Fit</button>
         <button class="primary" :disabled="submitting || processingCapture" @click="uploadCapture">
@@ -184,7 +180,7 @@ async function setCapturedPreview(blob: Blob): Promise<void> {
   }
 }
 
-function openNativePicker(): void {
+function openNativeCapture(): void {
   clearStatus();
   fileInputEl.value?.click();
 }
