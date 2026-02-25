@@ -52,6 +52,7 @@ final class ReceiptAiExtractor
         $model = trim((string) ($openai['model'] ?? 'gpt-4o-mini'));
         $baseUrl = rtrim((string) ($openai['base_url'] ?? 'https://api.openai.com/v1'), '/');
         $timeout = max(5, (int) ($openai['timeout_seconds'] ?? 45));
+        $maxOutputTokens = max(800, min(8000, (int) ($openai['max_output_tokens'] ?? 2600)));
 
         if ($apiKey === '') {
             return [
@@ -85,7 +86,7 @@ final class ReceiptAiExtractor
         }
 
         $existingRawText = trim((string) ($receipt['raw_text'] ?? ''));
-        $payload = $this->buildRequestPayload($model, $image['data_url'], $existingRawText);
+        $payload = $this->buildRequestPayload($model, $image['data_url'], $existingRawText, $maxOutputTokens);
 
         [$statusCode, $decoded, $error] = $this->postJson(
             $baseUrl . '/responses',
@@ -125,25 +126,29 @@ final class ReceiptAiExtractor
             ];
         }
 
-        $jsonText = $this->extractOutputText($decoded);
-        if ($jsonText === null) {
-            return [
-                'status' => 'failed',
-                'provider' => 'openai',
-                'model' => $model,
-                'fields' => [],
-                'reason' => 'OpenAI response did not include structured output.',
-            ];
+        $parsed = $this->extractOutputObject($decoded);
+        if (!is_array($parsed)) {
+            $jsonText = $this->extractOutputText($decoded);
+            if ($jsonText === null) {
+                return [
+                    'status' => 'failed',
+                    'provider' => 'openai',
+                    'model' => $model,
+                    'fields' => [],
+                    'reason' => 'OpenAI response did not include structured output.',
+                ];
+            }
+
+            $parsed = $this->decodeJsonText($jsonText);
         }
 
-        $parsed = json_decode($jsonText, true);
         if (!is_array($parsed)) {
             return [
                 'status' => 'failed',
                 'provider' => 'openai',
                 'model' => $model,
                 'fields' => [],
-                'reason' => 'OpenAI returned invalid JSON.',
+                'reason' => $this->buildInvalidJsonReason($decoded),
             ];
         }
 
@@ -189,7 +194,12 @@ final class ReceiptAiExtractor
     /**
      * @return array<string, mixed>
      */
-    private function buildRequestPayload(string $model, string $imageDataUrl, string $existingRawText): array
+    private function buildRequestPayload(
+        string $model,
+        string $imageDataUrl,
+        string $existingRawText,
+        int $maxOutputTokens
+    ): array
     {
         $schema = [
             'type' => 'object',
@@ -293,7 +303,7 @@ Rules:
                     'schema' => $schema,
                 ],
             ],
-            'max_output_tokens' => 1400,
+            'max_output_tokens' => $maxOutputTokens,
         ];
     }
 
@@ -370,6 +380,164 @@ Rules:
         }
 
         return null;
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @return array<string, mixed>|null
+     */
+    private function extractOutputObject(array $response): ?array
+    {
+        $directParsed = $response['output_parsed'] ?? null;
+        if (is_array($directParsed)) {
+            return $directParsed;
+        }
+
+        $output = $response['output'] ?? null;
+        if (!is_array($output)) {
+            return null;
+        }
+
+        foreach ($output as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $content = $entry['content'] ?? null;
+            if (!is_array($content)) {
+                continue;
+            }
+
+            foreach ($content as $chunk) {
+                if (!is_array($chunk)) {
+                    continue;
+                }
+
+                $parsed = $chunk['parsed'] ?? null;
+                if (is_array($parsed)) {
+                    return $parsed;
+                }
+
+                $json = $chunk['json'] ?? null;
+                if (is_array($json)) {
+                    return $json;
+                }
+
+                if (is_string($json)) {
+                    $decoded = $this->decodeJsonText($json);
+                    if (is_array($decoded)) {
+                        return $decoded;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodeJsonText(string $raw): ?array
+    {
+        $text = trim($raw);
+        if ($text === '') {
+            return null;
+        }
+
+        $parsed = json_decode($text, true);
+        if (is_array($parsed)) {
+            return $parsed;
+        }
+
+        if (preg_match('/```(?:json)?\s*(.*?)\s*```/is', $text, $matches) === 1) {
+            $fenced = json_decode((string) ($matches[1] ?? ''), true);
+            if (is_array($fenced)) {
+                return $fenced;
+            }
+        }
+
+        $firstObject = $this->extractFirstJsonObject($text);
+        if ($firstObject !== null) {
+            $recovered = json_decode($firstObject, true);
+            if (is_array($recovered)) {
+                return $recovered;
+            }
+        }
+
+        return null;
+    }
+
+    private function extractFirstJsonObject(string $text): ?string
+    {
+        $start = strpos($text, '{');
+        if ($start === false) {
+            return null;
+        }
+
+        $length = strlen($text);
+        $depth = 0;
+        $inString = false;
+        $escaping = false;
+
+        for ($i = $start; $i < $length; $i++) {
+            $char = $text[$i];
+
+            if ($inString) {
+                if ($escaping) {
+                    $escaping = false;
+                    continue;
+                }
+
+                if ($char === '\\') {
+                    $escaping = true;
+                    continue;
+                }
+
+                if ($char === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = true;
+                continue;
+            }
+
+            if ($char === '{') {
+                $depth++;
+                continue;
+            }
+
+            if ($char === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    return substr($text, $start, $i - $start + 1);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     */
+    private function buildInvalidJsonReason(array $response): string
+    {
+        $status = strtolower(trim((string) ($response['status'] ?? '')));
+        if ($status === 'incomplete') {
+            $incompleteReason = trim((string) ($response['incomplete_details']['reason'] ?? ''));
+            if ($incompleteReason !== '') {
+                return 'OpenAI output was incomplete (' . $incompleteReason . '). Increase max_output_tokens.';
+            }
+
+            return 'OpenAI output was incomplete. Increase max_output_tokens.';
+        }
+
+        return 'OpenAI returned invalid JSON.';
     }
 
     /**

@@ -175,9 +175,12 @@ Enable AI extraction in `api/config/config.php`:
     'model' => 'gpt-4o-mini',
     'base_url' => 'https://api.openai.com/v1',
     'timeout_seconds' => 45,
+    'max_output_tokens' => 2600,
   ],
 ],
 ```
+
+If long receipts fail with incomplete/invalid JSON, raise `max_output_tokens` (for example `3200`).
 
 ## Database Setup
 
