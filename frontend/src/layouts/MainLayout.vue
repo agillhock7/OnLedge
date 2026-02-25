@@ -6,7 +6,7 @@
       <router-link class="brand-home" to="/app/dashboard">
         <BrandLockup compact />
       </router-link>
-      <p class="sidebar-copy">Receipt intelligence for modern operators.</p>
+      <p class="sidebar-copy">Snap receipts, stay organized, and see where your money goes.</p>
       <nav class="menu">
         <router-link to="/app/dashboard">Dashboard</router-link>
         <router-link to="/app/capture">Capture</router-link>
