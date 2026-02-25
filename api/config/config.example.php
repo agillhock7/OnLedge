@@ -51,6 +51,7 @@ return [
             'base_url' => 'https://api.openai.com/v1',
             'timeout_seconds' => 45,
             'max_output_tokens' => 2600,
+            'report_max_output_tokens' => 3000,
         ],
     ],
     'oauth' => [

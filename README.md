@@ -48,6 +48,7 @@
 - Store records in PostgreSQL with full-text search support
 - Apply explainable rules during processing
 - Export receipts to CSV for reporting/accounting workflows
+- Visual reporting dashboard with trends, category/merchant insights, and AI-generated executive reviews
 
 ## Product Preview
 
@@ -176,11 +177,13 @@ Enable AI extraction in `api/config/config.php`:
     'base_url' => 'https://api.openai.com/v1',
     'timeout_seconds' => 45,
     'max_output_tokens' => 2600,
+    'report_max_output_tokens' => 3000,
   ],
 ],
 ```
 
 If long receipts fail with incomplete/invalid JSON, raise `max_output_tokens` (for example `3200`).
+If AI report generation truncates, raise `report_max_output_tokens` (for example `3600`).
 
 ## Database Setup
 
@@ -339,6 +342,8 @@ Rules / Search / Export:
 - `DELETE /api/rules/{id}`
 - `GET /api/search?q=...`
 - `GET /api/export/csv?from=YYYY-MM-DD&to=YYYY-MM-DD`
+- `GET /api/reports/overview?from=YYYY-MM-DD&to=YYYY-MM-DD`
+- `POST /api/reports/ai-review`
 
 Support:
 

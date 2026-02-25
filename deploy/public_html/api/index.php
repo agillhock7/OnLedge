@@ -7,6 +7,7 @@ use App\Controllers\AdminController;
 use App\Controllers\AuthController;
 use App\Controllers\ExportController;
 use App\Controllers\ReceiptController;
+use App\Controllers\ReportsController;
 use App\Controllers\RuleController;
 use App\Controllers\SearchController;
 use App\Controllers\SupportTicketController;
@@ -56,6 +57,7 @@ try {
     $ruleController = new RuleController($db, $auth);
     $searchController = new SearchController($db, $auth);
     $exportController = new ExportController($db, $auth);
+    $reportsController = new ReportsController($db, $auth, $config);
     $adminController = new AdminController($db, $auth);
     $supportTicketController = new SupportTicketController($db, $auth);
 
@@ -131,6 +133,12 @@ try {
     });
     $router->get('/export/csv', function () use ($exportController): void {
         $exportController->csv();
+    });
+    $router->get('/reports/overview', function () use ($reportsController): void {
+        $reportsController->overview();
+    });
+    $router->post('/reports/ai-review', function () use ($reportsController): void {
+        $reportsController->aiReview();
     });
 
     $router->post('/support/tickets', function () use ($supportTicketController): void {
