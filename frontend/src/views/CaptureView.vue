@@ -10,34 +10,36 @@
     </ol>
 
     <div class="card camera-capture" style="margin-top: 1rem">
-      <div class="camera-stage">
+      <div class="camera-stage" :class="{ 'is-preview': !!previewUrl }">
         <video
           v-show="!previewUrl && cameraSupported"
           ref="videoEl"
-          class="camera-feed"
+          class="camera-feed camera-feed-live"
           autoplay
           muted
           playsinline
         ></video>
 
-        <div v-if="previewUrl" class="preview-editor">
-          <img ref="previewImageEl" :src="previewUrl" alt="Receipt preview" class="camera-feed" />
+        <div v-if="previewUrl" class="preview-editor-wrap">
+          <div class="preview-editor">
+            <img ref="previewImageEl" :src="previewUrl" alt="Receipt preview" class="camera-feed camera-feed-preview" />
 
-          <svg class="edge-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <polygon :points="polygonPoints" />
-          </svg>
+            <svg class="edge-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <polygon :points="polygonPoints" />
+            </svg>
 
-          <button
-            v-for="(_, index) in corners"
-            :key="index"
-            class="corner-handle"
-            type="button"
-            :style="cornerStyle(index)"
-            :aria-label="`Move corner ${index + 1}`"
-            @pointerdown="startHandleDrag(index, $event)"
-          >
-            <span class="visually-hidden">Corner {{ index + 1 }}</span>
-          </button>
+            <button
+              v-for="(_, index) in corners"
+              :key="index"
+              class="corner-handle"
+              type="button"
+              :style="cornerStyle(index)"
+              :aria-label="`Move corner ${index + 1}`"
+              @pointerdown="startHandleDrag(index, $event)"
+            >
+              <span class="visually-hidden">Corner {{ index + 1 }}</span>
+            </button>
+          </div>
         </div>
 
         <div v-if="!previewUrl && cameraSupported" class="camera-overlay" aria-hidden="true">
@@ -182,8 +184,8 @@ async function startCamera(): Promise<void> {
     const mediaStream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: facingMode.value },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
+        width: { ideal: 1080 },
+        height: { ideal: 1920 }
       },
       audio: false
     });
