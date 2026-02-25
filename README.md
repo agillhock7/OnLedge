@@ -1,39 +1,77 @@
-# OnLedge
+<div align="center">
+  <img src="frontend/public/icon.svg" alt="OnLedge logo" width="96" height="96" />
+  <h1>OnLedge</h1>
+  <p><strong>Camera-first receipt capture, searchable records, and export-ready reporting.</strong></p>
+  <p>Built for cPanel shared hosting with a strict local-build, file-copy deployment model.</p>
 
-![OnLedge logo](frontend/public/icon.svg)
+  <p>
+    <img src="https://img.shields.io/badge/frontend-Vue%203%20%2B%20Vite-42b883?style=for-the-badge" alt="Vue 3 + Vite" />
+    <img src="https://img.shields.io/badge/backend-PHP%208.x-4F5B93?style=for-the-badge" alt="PHP 8.x" />
+    <img src="https://img.shields.io/badge/database-PostgreSQL%2010%2B-336791?style=for-the-badge" alt="PostgreSQL 10+" />
+    <img src="https://img.shields.io/badge/deploy-cPanel%20File--Copy-2D8CFF?style=for-the-badge" alt="cPanel file-copy deploy" />
+  </p>
+</div>
 
-Camera-first receipt capture with searchable records and clean exports.
+---
 
-OnLedge is built for teams that need fast expense capture, explainable processing, and deployment on cPanel shared hosting without server-side Node builds.
+## Table Of Contents
 
-## Live Project
+- [Live Links](#live-links)
+- [What OnLedge Does](#what-onledge-does)
+- [Product Preview](#product-preview)
+- [Architecture](#architecture)
+- [Why This Deployment Model](#why-this-deployment-model)
+- [Repository Layout](#repository-layout)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Database Setup](#database-setup)
+- [Build And Release Workflow](#build-and-release-workflow)
+- [cPanel Deployment Runbook](#cpanel-deployment-runbook)
+- [Public Repo Guardrails](#public-repo-guardrails)
+- [Security Baseline](#security-baseline)
+- [Branding And Social Metadata](#branding-and-social-metadata)
+- [API Surface (MVP)](#api-surface-mvp)
+- [Contributing](#contributing)
+- [Compatibility Notes](#compatibility-notes)
 
-- App URL: `https://onledge.gops.app`
+## Live Links
+
+- Production app: `https://onledge.gops.app`
 - Repository: `git@github.com:agillhock7/OnLedge.git`
 
-## Product Snapshot
+## What OnLedge Does
 
-- Capture receipts from camera or image picker
-- Store and search receipt data with PostgreSQL full-text search
-- Apply rules with explainability metadata
-- Export reports as CSV
-- Operate with an offline-aware frontend queue
+- Capture receipts directly from camera
+- Queue and sync intelligently with offline-aware frontend behavior
+- Store records in PostgreSQL with full-text search support
+- Apply explainable rules during processing
+- Export receipts to CSV for reporting/accounting workflows
 
-## Tech Stack
+## Product Preview
 
-- Frontend: Vue 3, Vite, TypeScript, Pinia, Vue Router, PWA, IndexedDB (`idb`)
-- Backend: PHP 8.x REST API
-- Database: PostgreSQL
-- Hosting target: cPanel shared hosting
+![OnLedge social card](frontend/public/social-card.png)
 
-## Deployment Model (Important)
+## Architecture
 
-This repo is intentionally designed for hosts where the server should only copy files.
+```mermaid
+flowchart LR
+  U[User Browser] --> F[Vue 3 PWA]
+  F -->|HTTPS /api| A[PHP API]
+  A -->|SQL| P[(PostgreSQL)]
+  F -->|Build output| D[deploy/public_html]
+  D -->|.cpanel.yml copy| W[/cPanel web root/]
+```
 
-- Build happens locally
-- Built artifacts are committed under `deploy/public_html`
-- cPanel Git deployment runs `.cpanel.yml` to copy files into web root
-- Server must not run `npm`, `vite`, or any Node build step
+## Why This Deployment Model
+
+OnLedge targets shared hosting where server-side Node builds are unreliable or unavailable.
+
+- Build frontend locally
+- Assemble runtime API files locally
+- Commit deploy artifacts
+- Let cPanel copy files into web root
+
+Hard rule: the server should never need `npm`, `vite`, or Node build steps.
 
 ## Repository Layout
 
@@ -48,38 +86,52 @@ This repo is intentionally designed for hosts where the server should only copy 
     prepare-deploy.sh
     generate-social-card.mjs
   /frontend
+    /public
+      icon.svg
+      social-card.png
   /api
+    /.htaccess
+    /.env.example
+    /config
+      config.example.php
+      (config.php is local/server only, never committed)
+    /migrations
+      001_init.sql
+    /public
+      index.php
+    /src
   /deploy/public_html
+    (committed deploy-ready artifacts)
 ```
 
-## Quick Start (Local)
+## Quick Start
 
 Prerequisites:
 
 - Node.js 20+
 - npm
 - PHP 8.x
-- PostgreSQL
+- PostgreSQL 10+
 
-Install frontend dependencies:
+Install dependencies:
 
 ```bash
 npm --prefix frontend install
 ```
 
-Run frontend dev server:
+Start frontend dev server:
 
 ```bash
 npm run dev
 ```
 
-Run API locally:
+Start local API server:
 
 ```bash
 php -S 127.0.0.1:8080 -t api/public
 ```
 
-Optional local frontend API override (`frontend/.env.local`):
+Optional local API override (`frontend/.env.local`):
 
 ```bash
 VITE_API_BASE_URL=http://127.0.0.1:8080
@@ -87,22 +139,22 @@ VITE_API_BASE_URL=http://127.0.0.1:8080
 
 ## Configuration
 
-Create runtime config from template:
+Create runtime config:
 
 ```bash
 cp api/config/config.example.php api/config/config.php
 ```
 
-Fill `api/config/config.php` with real values:
+Required production settings in `api/config/config.php`:
 
-- `app.env`, `app.url`, `app.api_base_url`
-- `app.debug_errors` (set `false` in production)
-- `database.host`, `port`, `dbname`, `user`, `password`, `sslmode`
-- `uploads.dir`, `max_upload_mb`, `allowed_mime_types`
-- `session_cookie.secure`, `session_cookie.httponly`, `session_cookie.samesite`
-- optional `smtp.*`
+- `app.env = 'production'`
+- `app.debug_errors = false`
+- `app.url`, `app.api_base_url`
+- DB connection (`host`, `port`, `dbname`, `user`, `password`, `sslmode`)
+- upload constraints (`uploads.dir`, `max_upload_mb`, `allowed_mime_types`)
+- secure session cookies (`secure`, `httponly`, `samesite`)
 
-Reference-only env mapping exists in `api/.env.example`.
+Reference key map: `api/.env.example`
 
 ## Database Setup
 
@@ -115,97 +167,94 @@ psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/
 Migration includes:
 
 - `users`, `password_resets`, `receipts`, `rules`
-- trigger-based `updated_at`
-- `tsvector` search + GIN index
-- extension-free UUID generator (`onledge_uuid_v4`) for shared hosts without `pgcrypto`
+- full-text search (`tsvector` + GIN index)
+- update triggers
+- extension-free UUID generation (`onledge_uuid_v4`) for shared hosts without `pgcrypto`
 
-## Build and Prepare Deploy Artifacts
+## Build And Release Workflow
 
-Build everything locally:
+Build locally and generate deploy artifacts:
 
 ```bash
 npm run build
 ```
 
-This command:
+What `npm run build` does:
 
 1. Builds frontend into `deploy/public_html`
-2. Recreates hardened `deploy/public_html/uploads`
+2. Recreates hardened uploads folder
 3. Copies API runtime into `deploy/public_html/api`
 
-Excluded by design:
+Excluded from deploy artifacts by design:
 
-- `api/config/config.php` (secret)
-- `api/migrations/` (not required at runtime)
+- `api/config/config.php`
+- `api/migrations/`
 
-## cPanel Deployment
+## cPanel Deployment Runbook
 
-`.cpanel.yml` copies deploy artifacts to:
-
-- `/home/gopsapp1/onledge.gops.app`
-
-Server details used by this project:
+Target paths:
 
 - cPanel Git working tree: `/home/gopsapp1/repositories/onledge`
-- Web root: `/home/gopsapp1/onledge.gops.app`
+- Apache/LiteSpeed web root: `/home/gopsapp1/onledge.gops.app`
 
-Typical release flow:
+Release sequence:
 
 1. `npm run build`
 2. `git add -A`
-3. `git commit -m "<message>"`
+3. `git commit -m "<release message>"`
 4. `git push origin main`
-5. Trigger cPanel deployment (or let auto-deploy run)
+5. Trigger cPanel deployment (or use auto-deploy)
 
-## Public Repo Guidance
+`.cpanel.yml` handles folder creation + file copy from `deploy/public_html`.
 
-This is a public repository. Keep it safe for forks, clones, and indexing.
+## Public Repo Guardrails
 
-Do not commit:
+This is a public repository. Treat all commits as publicly visible forever.
+
+Never commit:
 
 - `api/config/config.php`
-- real DB credentials
-- SMTP credentials
-- private tokens/keys
-- user-uploaded files
+- any real credentials (DB, SMTP, API tokens)
+- user-uploaded receipt files
+- server-local paths that include secrets
 
-Before pushing:
+Pre-push checklist:
 
-1. Confirm `git status` does not include any secret-bearing file.
-2. Confirm production secrets are only on server.
-3. Confirm `deploy/public_html` contains no private runtime data.
+1. `git status` contains no secret-bearing files.
+2. `deploy/public_html` contains no runtime secrets.
+3. Production secrets exist only on server.
 
-For vulnerability reporting process, see `SECURITY.md`.
+## Security Baseline
 
-## Branding Assets
+- Password hashing with `password_hash()`
+- User-scoped data access by `user_id`
+- Secure session cookie support (`secure`, `httponly`, `samesite`)
+- API hardening headers and no-store cache policy
+- Mutating API calls require `X-OnLedge-Client: web`
+- `.htaccess` blocks direct access to API internals (`config`, `migrations`, `src`)
 
-Primary assets:
+Security policy and disclosure guidance: see [SECURITY.md](SECURITY.md)
 
-- App icon/logo: `frontend/public/icon.svg`
-- Social card: `frontend/public/social-card.png` (1200x630)
+## Branding And Social Metadata
 
-Metadata for sharing is configured in `frontend/index.html`:
+Brand assets:
+
+- Logo icon: `frontend/public/icon.svg`
+- Social card: `frontend/public/social-card.png` (`1200x630`)
+
+Metadata configured in `frontend/index.html`:
 
 - Open Graph (`og:*`)
-- Twitter card (`twitter:*`)
+- Twitter cards (`twitter:*`)
 - canonical URL
-- JSON-LD `WebApplication`
+- JSON-LD (`WebApplication`)
 
-If branding updates are made, regenerate and verify:
+Regenerate social card when needed:
 
 ```bash
 node scripts/generate-social-card.mjs
 npm run build
 ```
-
-## Security Baseline
-
-- Password hashing with `password_hash()`
-- User-scoped queries by `user_id`
-- Secure session cookie support (`secure`, `httponly`, `samesite`)
-- API hardening headers on responses
-- `POST`/`PUT`/`DELETE` request guard: `X-OnLedge-Client: web`
-- `.htaccess` blocks direct access to API internals (`config`, `migrations`, `src`)
 
 ## API Surface (MVP)
 
@@ -226,7 +275,7 @@ Receipts:
 - `DELETE /api/receipts/{id}`
 - `POST /api/receipts/{id}/process`
 
-Rules/Search/Export:
+Rules / Search / Export:
 
 - `GET /api/rules`
 - `POST /api/rules`
@@ -235,12 +284,14 @@ Rules/Search/Export:
 - `GET /api/search?q=...`
 - `GET /api/export/csv?from=YYYY-MM-DD&to=YYYY-MM-DD`
 
-## Contribution Guidance
+## Contributing
 
 - Keep changes scoped and reviewable.
-- Include deploy artifacts when frontend/API runtime behavior changes.
-- Prefer security-first defaults in code and docs.
-- Run checks before PRs:
+- Preserve local-build -> committed-artifacts deployment flow.
+- Update `deploy/public_html` whenever runtime frontend/API output changes.
+- Prefer secure defaults and document behavioral changes.
+
+Recommended checks before PR:
 
 ```bash
 npm --prefix frontend run typecheck
@@ -252,7 +303,7 @@ npm run build
 Target hosting profile:
 
 - cPanel `132.0 (build 24)`
-- Apache `2.4.66` / LiteSpeed-compatible behavior
+- Apache `2.4.66` (LiteSpeed-compatible request handling)
 - Linux `x86_64`
 - PHP `8.x`
-- PostgreSQL `10+` (migration is compatible with shared-host constraints)
+- PostgreSQL `10+`
