@@ -46,6 +46,16 @@ type ReceiptSingleResponse = {
   item: Receipt;
 };
 
+type ReceiptProcessResponse = {
+  item: Receipt;
+  explanation?: Array<{
+    stage?: string;
+    status?: string;
+    reason?: string;
+    fields_extracted?: string[];
+  }>;
+};
+
 export const useReceiptsStore = defineStore('receipts', {
   state: () => ({
     items: [] as Receipt[],
@@ -174,10 +184,11 @@ export const useReceiptsStore = defineStore('receipts', {
       this.items = this.items.filter((item) => item.id !== id);
     },
 
-    async processReceipt(id: string): Promise<void> {
-      const response = await apiPost<ReceiptSingleResponse>(`/receipts/${id}/process`, {});
+    async processReceipt(id: string): Promise<ReceiptProcessResponse> {
+      const response = await apiPost<ReceiptProcessResponse>(`/receipts/${id}/process`, {});
       this.items = this.items.map((item) => (item.id === id ? response.item : item));
       await putLocalReceipt({ ...response.item, offline: false } as LocalReceipt);
+      return response;
     },
 
     async search(query: string): Promise<Receipt[]> {

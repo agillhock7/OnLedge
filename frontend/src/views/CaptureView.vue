@@ -360,7 +360,7 @@ async function uploadCapture(): Promise<void> {
   clearStatus();
 
   try {
-    const uploadBlob = await correctReceiptPerspective(capturedBlob.value, corners.value, { enhance: true });
+    const uploadBlob = await correctReceiptPerspective(capturedBlob.value, corners.value, { enhance: false });
 
     const file = new File(
       [uploadBlob],
@@ -376,15 +376,33 @@ async function uploadCapture(): Promise<void> {
       file
     );
 
+    let processingNote = '';
     if (navigator.onLine && !created.offline) {
-      await receipts.processReceipt(created.id).catch(() => {
-        // AI extraction is best-effort; upload should still succeed.
-      });
+      try {
+        const processed = await receipts.processReceipt(created.id);
+        const aiStage = Array.isArray(processed.explanation)
+          ? processed.explanation.find((step) => step?.stage === 'ai_extraction')
+          : undefined;
+
+        if (aiStage && aiStage.status !== 'success') {
+          const reason = (aiStage.reason ?? '').trim();
+          processingNote = reason !== ''
+            ? `Upload complete, but extraction needs retry (${reason}).`
+            : 'Upload complete, but extraction needs retry.';
+        } else if (aiStage && Array.isArray(aiStage.fields_extracted) && aiStage.fields_extracted.length === 0) {
+          processingNote = 'Upload complete, but no fields were extracted. Try Auto Fit or adjust corners tighter.';
+        }
+      } catch (processingError) {
+        const reason = processingError instanceof Error ? processingError.message : 'Processing request failed';
+        processingNote = `Upload complete, but extraction failed (${reason}).`;
+      }
     }
 
-    message.value = navigator.onLine
-      ? 'Receipt uploaded. AI extraction started.'
-      : 'Receipt saved offline. It will sync when you reconnect.';
+    if (navigator.onLine) {
+      message.value = processingNote !== '' ? processingNote : 'Receipt uploaded and extracted successfully.';
+    } else {
+      message.value = 'Receipt saved offline. It will sync when you reconnect.';
+    }
 
     capturedBlob.value = null;
     clearPreview();

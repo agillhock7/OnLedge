@@ -349,6 +349,16 @@ function distance(ax: number, ay: number, bx: number, by: number): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+function polygonArea(points: Array<{ x: number; y: number }>): number {
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const current = points[i];
+    const next = points[(i + 1) % points.length];
+    area += current.x * next.y - next.x * current.y;
+  }
+  return Math.abs(area) / 2;
+}
+
 export async function suggestReceiptCorners(blob: Blob): Promise<NormalizedCorner[]> {
   const loaded = await loadImageFromBlob(blob);
   try {
@@ -391,10 +401,26 @@ export async function correctReceiptPerspective(
     const sourceImage = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
     const sourceData = sourceImage.data;
 
-    const [tl, tr, br, bl] = orderCorners(corners).map((point) => ({
+    const ordered = orderCorners(corners).map((point) => ({
       x: point.x * sourceCanvas.width,
       y: point.y * sourceCanvas.height,
     }));
+    const [tl, tr, br, bl] = ordered;
+
+    const selectedArea = polygonArea(ordered);
+    const totalArea = sourceCanvas.width * sourceCanvas.height;
+    if (!Number.isFinite(selectedArea) || selectedArea < totalArea * 0.015) {
+      throw new Error('Selected area is too small. Adjust the crop corners and try again.');
+    }
+
+    const topEdge = distance(tl.x, tl.y, tr.x, tr.y);
+    const rightEdge = distance(tr.x, tr.y, br.x, br.y);
+    const bottomEdge = distance(br.x, br.y, bl.x, bl.y);
+    const leftEdge = distance(bl.x, bl.y, tl.x, tl.y);
+    const minEdge = Math.min(topEdge, rightEdge, bottomEdge, leftEdge);
+    if (!Number.isFinite(minEdge) || minEdge < 40) {
+      throw new Error('Crop corners are too close together. Widen the selected area and try again.');
+    }
 
     let outWidth = Math.round((distance(tl.x, tl.y, tr.x, tr.y) + distance(bl.x, bl.y, br.x, br.y)) / 2);
     let outHeight = Math.round((distance(tl.x, tl.y, bl.x, bl.y) + distance(tr.x, tr.y, br.x, br.y)) / 2);
@@ -451,7 +477,7 @@ export async function correctReceiptPerspective(
 
     outputCtx.putImageData(outputImage, 0, 0);
 
-    if (options.enhance ?? true) {
+    if (options.enhance ?? false) {
       enhanceReceipt(outputCanvas);
     }
 
