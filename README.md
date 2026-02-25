@@ -1,14 +1,14 @@
 <div align="center">
   <img src="frontend/public/icon.svg" alt="OnLedge logo" width="96" height="96" />
   <h1>OnLedge</h1>
-  <p><strong>Camera-first receipt capture, searchable records, and export-ready reporting.</strong></p>
-  <p>Built for cPanel shared hosting with a strict local-build, file-copy deployment model.</p>
+  <p><strong>Capture receipts fast, keep records clean, and export with confidence.</strong></p>
+  <p>Built for cPanel shared hosting where deployment is file-copy only.</p>
 
   <p>
     <img src="https://img.shields.io/badge/frontend-Vue%203%20%2B%20Vite-42b883?style=for-the-badge" alt="Vue 3 + Vite" />
     <img src="https://img.shields.io/badge/backend-PHP%208.x-4F5B93?style=for-the-badge" alt="PHP 8.x" />
     <img src="https://img.shields.io/badge/database-PostgreSQL%2010%2B-336791?style=for-the-badge" alt="PostgreSQL 10+" />
-    <img src="https://img.shields.io/badge/deploy-cPanel%20File--Copy-2D8CFF?style=for-the-badge" alt="cPanel file-copy deploy" />
+    <img src="https://img.shields.io/badge/deploy-cPanel%20Git%20Copy%20Flow-2D8CFF?style=for-the-badge" alt="cPanel Git copy deploy" />
   </p>
 </div>
 
@@ -16,67 +16,68 @@
 
 ## Table Of Contents
 
-- [Live Links](#live-links)
-- [What OnLedge Does](#what-onledge-does)
-- [Product Preview](#product-preview)
+- [Live Project](#live-project)
+- [What OnLedge Includes](#what-onledge-includes)
+- [Hosting Model (Important)](#hosting-model-important)
 - [Architecture](#architecture)
-- [Why This Deployment Model](#why-this-deployment-model)
 - [Repository Layout](#repository-layout)
-- [Quick Start](#quick-start)
+- [Quick Start (Local)](#quick-start-local)
 - [Configuration](#configuration)
 - [Database Setup](#database-setup)
-- [Admin Bootstrap](#admin-bootstrap)
-- [Build And Release Workflow](#build-and-release-workflow)
-- [cPanel Deployment Runbook](#cpanel-deployment-runbook)
-- [Cron Jobs](#cron-jobs)
-- [Public Repo Guardrails](#public-repo-guardrails)
-- [Security Baseline](#security-baseline)
-- [Branding And Social Metadata](#branding-and-social-metadata)
-- [API Surface (MVP)](#api-surface-mvp)
+- [Database Permissions (Required)](#database-permissions-required)
+- [Admin Bootstrap (Seed Owner)](#admin-bootstrap-seed-owner)
+- [OAuth Setup (GitHub + Discord)](#oauth-setup-github--discord)
+- [Email Notifications](#email-notifications)
+- [Build And Release](#build-and-release)
+- [cPanel Deployment](#cpanel-deployment)
+- [Cron Job (Weekly Reports)](#cron-job-weekly-reports)
+- [Security Checklist](#security-checklist)
+- [API Surface](#api-surface)
+- [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [Compatibility Notes](#compatibility-notes)
 
-## Live Links
+## Live Project
 
 - Production app: `https://onledge.gops.app`
 - Repository: `git@github.com:agillhock7/OnLedge.git`
 
-## What OnLedge Does
+## What OnLedge Includes
 
-- Capture receipts directly from camera
-- Queue and sync intelligently with offline-aware frontend behavior
-- Extract vendor, totals, dates, OCR text, and line items with AI processing
-- Store records in PostgreSQL with full-text search support
-- Apply explainable rules during processing
-- Export receipts to CSV for reporting/accounting workflows
-- Visual reporting dashboard with trends, category/merchant insights, and AI-generated executive reviews
-- Threaded support workspace with email notifications
+- Camera-first receipt capture flow with mobile-friendly UX
+- Manual edge adjustment before upload for cleaner extraction
+- AI-assisted extraction (vendor, totals, dates, taxes, line items, etc.)
+- Receipt profile editing with full detail correction workflow
+- Searchable receipt command center
+- Reporting dashboard with trend visualizations and AI review
+- Rules engine with no-code GUI and explainability traces
+- Role-based access (`user`, `admin`, `owner`)
+- Threaded support ticket workspace
+- Welcome + weekly report emails, plus in-app "Send Test Email"
+- Offline-aware frontend queue with sync-on-reconnect
 
-## Product Preview
+## Hosting Model (Important)
 
-![OnLedge social card](frontend/public/social-card.png)
+This repo is intentionally designed for shared hosting constraints.
+
+Hard rule:
+- The server must never need `npm`, `vite`, or Node build steps.
+
+Deployment model:
+1. Build locally.
+2. Assemble deploy artifacts into `deploy/public_html`.
+3. Commit artifacts.
+4. Let cPanel Git deployment copy files into web root.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  U[User Browser] --> F[Vue 3 PWA]
-  F -->|HTTPS /api| A[PHP API]
+  U[Browser / PWA] -->|HTTPS /api| A[PHP API]
   A -->|SQL| P[(PostgreSQL)]
-  F -->|Build output| D[deploy/public_html]
-  D -->|.cpanel.yml copy| W[/cPanel web root/]
+  B[Local Build Machine] -->|npm run build| D[deploy/public_html]
+  D -->|.cpanel.yml copy| W[/home/gopsapp1/onledge.gops.app]
 ```
-
-## Why This Deployment Model
-
-OnLedge targets shared hosting where server-side Node builds are unreliable or unavailable.
-
-- Build frontend locally
-- Assemble runtime API files locally
-- Commit deploy artifacts
-- Let cPanel copy files into web root
-
-Hard rule: the server should never need `npm`, `vite`, or Node build steps.
 
 ## Repository Layout
 
@@ -89,6 +90,8 @@ Hard rule: the server should never need `npm`, `vite`, or Node build steps.
   package.json
   /scripts
     prepare-deploy.sh
+    create-seed-owner.php
+    run-weekly-report-cron.php
     generate-social-card.mjs
   /frontend
     /public
@@ -103,7 +106,6 @@ Hard rule: the server should never need `npm`, `vite`, or Node build steps.
     /migrations
       001_init.sql
       002_admin_support.sql
-      003_seed_owner.example.sql
       004_oauth_identities.sql
       005_receipt_ai_fields.sql
       006_support_threads.sql
@@ -112,37 +114,36 @@ Hard rule: the server should never need `npm`, `vite`, or Node build steps.
       index.php
     /src
   /deploy/public_html
-    (committed deploy-ready artifacts)
+    (committed deploy artifacts)
 ```
 
-## Quick Start
+## Quick Start (Local)
 
 Prerequisites:
-
 - Node.js 20+
 - npm
 - PHP 8.x
 - PostgreSQL 10+
 
-Install dependencies:
+Install frontend dependencies:
 
 ```bash
 npm --prefix frontend install
 ```
 
-Start frontend dev server:
+Run frontend:
 
 ```bash
 npm run dev
 ```
 
-Start local API server:
+Run API locally:
 
 ```bash
 php -S 127.0.0.1:8080 -t api/public
 ```
 
-Optional local API override (`frontend/.env.local`):
+Optional frontend API override (`frontend/.env.local`):
 
 ```bash
 VITE_API_BASE_URL=http://127.0.0.1:8080
@@ -156,39 +157,21 @@ Create runtime config:
 cp api/config/config.example.php api/config/config.php
 ```
 
-Required production settings in `api/config/config.php`:
+`api/config/config.php` is required at runtime and must never be committed.
 
-- `app.env = 'production'`
-- `app.debug_errors = false`
-- `app.url`, `app.api_base_url`
-- DB connection (`host`, `port`, `dbname`, `user`, `password`, `sslmode`)
-- upload constraints (`uploads.dir`, `max_upload_mb`, `allowed_mime_types`)
-- secure session cookies (`secure`, `httponly`, `samesite`)
-- optional AI extraction provider (`ai.enabled`, `ai.openai.*`)
-- optional OAuth providers (`oauth.github.*`, `oauth.discord.*`)
-- optional support email notifications (`smtp.enabled`, `smtp.from_*`)
+Required values to set:
+- `app.env`, `app.url`, `app.api_base_url`
+- `database.host`, `port`, `dbname`, `user`, `password`, `sslmode`
+- `uploads.dir`, `uploads.max_upload_mb`, `uploads.allowed_mime_types`
+- `session_cookie.secure`, `httponly`, `samesite`
 
-Reference key map: `api/.env.example`
+Optional sections:
+- `ai` for receipt extraction and report review
+- `oauth` for GitHub/Discord login
+- `smtp` for enabling email notifications (transport uses PHP `mail()` / server sendmail)
 
-Enable AI extraction in `api/config/config.php`:
-
-```php
-'ai' => [
-  'enabled' => true,
-  'provider' => 'openai',
-  'openai' => [
-    'api_key' => 'sk-...',
-    'model' => 'gpt-4o-mini',
-    'base_url' => 'https://api.openai.com/v1',
-    'timeout_seconds' => 45,
-    'max_output_tokens' => 2600,
-    'report_max_output_tokens' => 3000,
-  ],
-],
-```
-
-If long receipts fail with incomplete/invalid JSON, raise `max_output_tokens` (for example `3200`).
-If AI report generation truncates, raise `report_max_output_tokens` (for example `3600`).
+Reference map for env-style keys:
+- `api/.env.example`
 
 ## Database Setup
 
@@ -203,153 +186,163 @@ psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/007_user_notifications.sql
 ```
 
-If using pgAdmin query window, paste file contents directly.
-Do not use `\\i` there (`\\i` is a psql shell command, not SQL).
+Important PostgreSQL notes for shared hosts:
+- `001_init.sql` is PostgreSQL 10 compatible (`EXECUTE PROCEDURE`, not `EXECUTE FUNCTION`).
+- UUID generation uses `onledge_uuid_v4()` and does not require `pgcrypto`.
+- In pgAdmin query windows, do not use `\i`. Paste SQL file contents directly.
 
-Migration includes:
+## Database Permissions (Required)
 
-- `users`, `password_resets`, `receipts`, `rules`
-- full-text search (`tsvector` + GIN index)
-- update triggers
-- extension-free UUID generation (`onledge_uuid_v4`) for shared hosts without `pgcrypto`
-- role-based users (`user`, `admin`, `owner`) and support ticket tables
-- threaded support conversations (`support_ticket_messages`) with assignment/status lifecycle
-- OAuth identity linking table (`oauth_identities`) for GitHub/Discord login
-- AI extraction fields for merchant metadata, payment details, and `line_items`
-- user notification settings for weekly email reports and welcome-email tracking
+After migrations, grant privileges to your app DB user (example: `gopsapp1_onledgeusr`):
 
-Support email templates are stored in:
+```sql
+GRANT USAGE ON SCHEMA public TO gopsapp1_onledgeusr;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO gopsapp1_onledgeusr;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO gopsapp1_onledgeusr;
 
-- `api/src/Templates/Email/support_ticket_created_user.php`
-- `api/src/Templates/Email/support_ticket_created_admin.php`
-- `api/src/Templates/Email/support_ticket_reply_user.php`
-- `api/src/Templates/Email/support_ticket_reply_admin.php`
-- `api/src/Templates/Email/support_ticket_updated_user.php`
-- `api/src/Templates/Email/welcome_user.php`
-- `api/src/Templates/Email/weekly_spending_report.php`
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gopsapp1_onledgeusr;
 
-When `smtp.enabled = true`, the API sends template-based notifications through PHP `mail()`/server sendmail.
-Weekly spending reports are enabled by default for new users and can be toggled in **Settings**.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO gopsapp1_onledgeusr;
+```
 
-## Admin Bootstrap
+Without these grants, API calls may fail with SQLSTATE `42501` permission errors.
 
-Seed an initial owner account (one-time setup):
+## Admin Bootstrap (Seed Owner)
 
-1. Generate a ready-to-run seed SQL block + one-time credentials:
+Create a one-time seed owner quickly:
 
 ```bash
 php scripts/create-seed-owner.php
 ```
 
-2. Copy the generated SQL output and run it in pgAdmin.
-3. Login with seeded owner account.
-4. In **Settings > Admin: User Management**, create permanent admin/owner users.
-5. Disable the seed account after permanent access is verified.
+This prints:
+- temporary email
+- temporary password
+- SQL block to run in your PostgreSQL UI
 
-## Build And Release Workflow
+Recommended flow:
+1. Run script.
+2. Execute printed SQL.
+3. Login with seed owner.
+4. Create permanent owner/admin users in Settings.
+5. Disable seed account(s).
 
-Build locally and generate deploy artifacts:
+## OAuth Setup (GitHub + Discord)
+
+Enable providers in `api/config/config.php`:
+- `oauth.github.enabled = true`
+- `oauth.discord.enabled = true`
+
+Set client credentials and exact callback URLs:
+- GitHub callback: `https://onledge.gops.app/api/auth/oauth/github/callback`
+- Discord callback: `https://onledge.gops.app/api/auth/oauth/discord/callback`
+
+Run migration `004_oauth_identities.sql` before using social login.
+
+## Email Notifications
+
+Email templates live in `api/src/Templates/Email/`.
+
+Current templates:
+- support ticket created/replied/updated
+- welcome email
+- weekly spending report
+- test notification
+
+Enable notifications in `api/config/config.php`:
+
+```php
+'smtp' => [
+  'enabled' => true,
+  'from_email' => 'records@onledge.gops.app',
+  'from_name' => 'OnLedge',
+  'reply_to' => 'support@onledge.gops.app',
+],
+```
+
+Note:
+- Sending uses PHP `mail()` / server sendmail.
+- `smtp.enabled` is the on/off gate.
+- Host/port/user/password fields are metadata placeholders unless your server mail stack is configured to use them.
+
+## Build And Release
+
+Build deploy artifacts locally:
 
 ```bash
 npm run build
 ```
 
-What `npm run build` does:
+What this does:
+1. Builds frontend with Vite directly into `deploy/public_html`.
+2. Rebuilds hardened `deploy/public_html/uploads` files.
+3. Copies API runtime files into `deploy/public_html/api`.
 
-1. Builds frontend into `deploy/public_html`
-2. Recreates hardened uploads folder
-3. Copies API runtime into `deploy/public_html/api`
+Never deploy from unbuilt source.
 
-Excluded from deploy artifacts by design:
+Release flow:
 
-- `api/config/config.php`
-- `api/migrations/`
+```bash
+npm run build
+git add -A
+git commit -m "<release message>"
+git push origin main
+```
 
-## cPanel Deployment Runbook
+## cPanel Deployment
 
-Target paths:
+`.cpanel.yml` runs on cPanel deploy and copies artifacts to web root:
 
-- cPanel Git working tree: `/home/gopsapp1/repositories/onledge`
-- Apache/LiteSpeed web root: `/home/gopsapp1/onledge.gops.app`
+```yaml
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/gopsapp1/onledge.gops.app/
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/mkdir -p $DEPLOYPATH/uploads
+    - /bin/mkdir -p $DEPLOYPATH/api
+    - /bin/chmod 775 $DEPLOYPATH/uploads
+    - /bin/cp -R deploy/public_html/. $DEPLOYPATH
+```
 
-Release sequence:
+Deployment targets:
+- cPanel Git working tree: `/home/gopsapp1/repositories/onledge` (or `OnLedge` depending on server-side clone name)
+- Web root: `/home/gopsapp1/onledge.gops.app`
 
-1. `npm run build`
-2. `git add -A`
-3. `git commit -m "<release message>"`
-4. `git push origin main`
-5. Trigger cPanel deployment (or use auto-deploy)
+## Cron Job (Weekly Reports)
 
-`.cpanel.yml` handles folder creation + file copy from `deploy/public_html`.
-
-## Cron Jobs
-
-To send weekly spending reports on schedule (instead of waiting for user login activity), configure a cPanel cron job:
+Set a cPanel cron command:
 
 ```bash
 /usr/bin/php /home/gopsapp1/repositories/OnLedge/scripts/run-weekly-report-cron.php >> /home/gopsapp1/logs/onledge-weekly-cron.log 2>&1
 ```
 
 Recommended schedule:
+- Weekly Monday morning, or
+- Daily (script self-limits to once every 7 days per user)
 
-- Weekly: Monday at `08:00` server time, or
-- Daily: every morning (script self-limits to max once every 7 days per user).
+## Security Checklist
 
-The script uses a lock file (`/tmp/onledge-weekly-report-cron.lock`) to prevent overlapping runs.
+Public repo guardrails:
+- Never commit `api/config/config.php`.
+- Never commit real DB/API/SMTP credentials.
+- Never commit uploaded receipt files.
+- Keep deploy artifacts secret-free.
 
-## Public Repo Guardrails
+Application baseline:
+- Passwords hashed via `password_hash()`.
+- User data scoped by `user_id`.
+- Secure session cookies (`secure`, `httponly`, `samesite`).
+- API security headers + mutating request guard (`X-OnLedge-Client: web`).
+- API internals protected by `.htaccess`.
+- File preview endpoint is same-origin-only for secure inline rendering.
 
-This is a public repository. Treat all commits as publicly visible forever.
+For vulnerability disclosure process, see [SECURITY.md](SECURITY.md).
 
-Never commit:
-
-- `api/config/config.php`
-- any real credentials (DB, SMTP, API tokens)
-- user-uploaded receipt files
-- server-local paths that include secrets
-
-Pre-push checklist:
-
-1. `git status` contains no secret-bearing files.
-2. `deploy/public_html` contains no runtime secrets.
-3. Production secrets exist only on server.
-
-## Security Baseline
-
-- Password hashing with `password_hash()`
-- User-scoped data access by `user_id`
-- Secure session cookie support (`secure`, `httponly`, `samesite`)
-- API hardening headers and no-store cache policy
-- Mutating API calls require `X-OnLedge-Client: web`
-- `.htaccess` blocks direct access to API internals (`config`, `migrations`, `src`)
-
-Security policy and disclosure guidance: see [SECURITY.md](SECURITY.md)
-
-## Branding And Social Metadata
-
-Brand assets:
-
-- Logo icon: `frontend/public/icon.svg`
-- Social card: `frontend/public/social-card.png` (`1200x630`)
-
-Metadata configured in `frontend/index.html`:
-
-- Open Graph (`og:*`)
-- Twitter cards (`twitter:*`)
-- canonical URL
-- JSON-LD (`WebApplication`)
-
-Regenerate social card when needed:
-
-```bash
-node scripts/generate-social-card.mjs
-npm run build
-```
-
-## API Surface (MVP)
+## API Surface
 
 Auth:
-
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
@@ -362,17 +355,15 @@ Auth:
 - `GET /api/auth/oauth/discord/callback`
 
 Receipts:
-
 - `GET /api/receipts`
 - `POST /api/receipts`
 - `GET /api/receipts/{id}`
+- `GET /api/receipts/{id}/image`
 - `PUT /api/receipts/{id}`
 - `DELETE /api/receipts/{id}`
 - `POST /api/receipts/{id}/process`
-  - Runs AI extraction (when configured), then rule engine, and stores explainability details.
 
-Rules / Search / Export:
-
+Rules / Search / Export / Reports:
 - `GET /api/rules`
 - `POST /api/rules`
 - `PUT /api/rules/{id}`
@@ -381,32 +372,67 @@ Rules / Search / Export:
 - `GET /api/export/csv?from=YYYY-MM-DD&to=YYYY-MM-DD`
 - `GET /api/reports/overview?from=YYYY-MM-DD&to=YYYY-MM-DD`
 - `POST /api/reports/ai-review`
+
+Notifications:
 - `GET /api/notifications/preferences`
 - `PUT /api/notifications/preferences`
+- `POST /api/notifications/test-email`
 
 Support:
-
 - `POST /api/support/tickets`
 - `GET /api/support/tickets/my`
 - `GET /api/support/tickets/{id}`
 - `POST /api/support/tickets/{id}/messages`
 
 Admin:
-
 - `GET /api/admin/users`
 - `POST /api/admin/users`
 - `PUT /api/admin/users/{id}`
 - `GET /api/admin/tickets`
 - `PUT /api/admin/tickets/{id}`
 
+## Troubleshooting
+
+### `500` with DB permission errors (`SQLSTATE 42501`)
+
+Grant table/sequence privileges to the app DB user. See [Database Permissions (Required)](#database-permissions-required).
+
+### `syntax error at or near "FUNCTION"` in trigger creation
+
+You are on PostgreSQL 10 behavior. Use migration files from this repo (they use `EXECUTE PROCEDURE`).
+
+### `could not open extension control file ... pgcrypto.control`
+
+Do not install `pgcrypto` on shared hosts that block extensions. This project uses `onledge_uuid_v4()` instead.
+
+### pgAdmin rejects `\i`
+
+`\i` is a `psql` shell command, not SQL. Paste migration content directly in pgAdmin query window.
+
+### PDF preview blocked with `frame-ancestors 'none'`
+
+Fixed in current versions by scoped same-origin header override on `/api/receipts/{id}/image`. Pull latest and redeploy.
+
+### Social login opens blank page
+
+Confirm:
+- `oauth.<provider>.enabled = true`
+- correct callback URL in provider console and `config.php`
+- migration `004_oauth_identities.sql` is applied
+
+### Seed login fails
+
+Recreate a fresh seed using `php scripts/create-seed-owner.php`, run emitted SQL, then login with printed credentials.
+
 ## Contributing
 
+Standards for PRs:
 - Keep changes scoped and reviewable.
-- Preserve local-build -> committed-artifacts deployment flow.
-- Update `deploy/public_html` whenever runtime frontend/API output changes.
-- Prefer secure defaults and document behavioral changes.
+- Preserve local-build -> committed-artifacts deployment model.
+- Update `deploy/public_html` when runtime frontend/API output changes.
+- Maintain secure defaults and document behavior changes.
 
-Recommended checks before PR:
+Recommended checks before pushing:
 
 ```bash
 npm --prefix frontend run typecheck
@@ -416,9 +442,12 @@ npm run build
 ## Compatibility Notes
 
 Target hosting profile:
-
-- cPanel `132.0 (build 24)`
-- Apache `2.4.66` (LiteSpeed-compatible request handling)
+- cPanel `132.x`
+- Apache/LiteSpeed-compatible environment
 - Linux `x86_64`
 - PHP `8.x`
 - PostgreSQL `10+`
+
+---
+
+![OnLedge social card](frontend/public/social-card.png)
