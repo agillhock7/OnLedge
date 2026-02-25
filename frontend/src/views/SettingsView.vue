@@ -482,11 +482,16 @@ async function saveUser(user: ManagedUser) {
   userError.value = '';
 
   try {
-    await apiPut(`/admin/users/${user.id}`, {
+    const payload: Record<string, unknown> = {
       role: user.role,
-      is_active: user.is_active,
-      is_seed: user.is_seed
-    });
+      is_active: user.is_active
+    };
+
+    if (auth.isOwner) {
+      payload.is_seed = user.is_seed;
+    }
+
+    await apiPut(`/admin/users/${user.id}`, payload);
 
     await loadAdminData();
   } catch (error) {

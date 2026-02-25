@@ -15,6 +15,9 @@ use PDOException;
 
 final class AdminController
 {
+    /** @var array<string, bool> */
+    private array $userColumnCache = [];
+
     public function __construct(private readonly PDO $db, private readonly SessionAuth $auth)
     {
     }
@@ -25,10 +28,13 @@ final class AdminController
         $this->currentAdmin();
 
         $stmt = $this->db->query(
-            'SELECT id, email, role, is_active, is_seed, disabled_at, created_at, updated_at
-             FROM users
-             ORDER BY created_at DESC
-             LIMIT 500'
+            sprintf(
+                'SELECT %s
+                 FROM users
+                 ORDER BY created_at DESC
+                 LIMIT 500',
+                $this->userSelectColumnsSql(),
+            )
         );
 
         $items = $stmt->fetchAll() ?: [];
@@ -68,9 +74,12 @@ final class AdminController
 
         try {
             $stmt = $this->db->prepare(
-                'INSERT INTO users (email, password_hash, role, is_seed)
-                 VALUES (:email, :password_hash, :role, :is_seed)
-                 RETURNING id, email, role, is_active, is_seed, disabled_at, created_at, updated_at'
+                sprintf(
+                    'INSERT INTO users (email, password_hash, role, is_seed)
+                     VALUES (:email, :password_hash, :role, :is_seed)
+                     RETURNING %s',
+                    $this->userSelectColumnsSql(),
+                )
             );
             $stmt->execute([
                 ':email' => $email,
@@ -82,6 +91,9 @@ final class AdminController
         } catch (PDOException $exception) {
             if ($exception->getCode() === '23505') {
                 throw new HttpException('Email is already registered', 409);
+            }
+            if ($exception->getCode() === '23514') {
+                throw new HttpException('User role violates database constraint. Re-run admin migration.', 422);
             }
             throw $exception;
         }
@@ -144,8 +156,10 @@ final class AdminController
             $fields[] = 'is_active = :is_active';
             $payload[':is_active'] = $isActive;
 
-            $fields[] = 'disabled_at = :disabled_at';
-            $payload[':disabled_at'] = $isActive ? null : (new \DateTimeImmutable())->format(DATE_ATOM);
+            if ($this->hasUserColumn('disabled_at')) {
+                $fields[] = 'disabled_at = :disabled_at';
+                $payload[':disabled_at'] = $isActive ? null : (new \DateTimeImmutable())->format(DATE_ATOM);
+            }
         }
 
         if ($fields === []) {
@@ -153,12 +167,22 @@ final class AdminController
             return;
         }
 
-        $sql = 'UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = :id
-                RETURNING id, email, role, is_active, is_seed, disabled_at, created_at, updated_at';
+        $sql = sprintf(
+            'UPDATE users SET %s WHERE id = :id RETURNING %s',
+            implode(', ', $fields),
+            $this->userSelectColumnsSql(),
+        );
 
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($payload);
-        $updated = $stmt->fetch();
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($payload);
+            $updated = $stmt->fetch();
+        } catch (PDOException $exception) {
+            if ($exception->getCode() === '23514') {
+                throw new HttpException('User role violates database constraint. Re-run admin migration.', 422);
+            }
+            throw $exception;
+        }
 
         Response::json(['item' => Authz::normalizeUser($updated ?: [])]);
     }
@@ -175,5 +199,29 @@ final class AdminController
         if (!Schema::hasAdminUserColumns($this->db)) {
             throw new HttpException('Admin schema missing. Run migration 002_admin_support.sql', 503);
         }
+    }
+
+    private function hasUserColumn(string $column): bool
+    {
+        if (array_key_exists($column, $this->userColumnCache)) {
+            return $this->userColumnCache[$column];
+        }
+
+        $exists = Schema::hasColumn($this->db, 'users', $column);
+        $this->userColumnCache[$column] = $exists;
+
+        return $exists;
+    }
+
+    private function userSelectColumnsSql(): string
+    {
+        $columns = ['id', 'email', 'role', 'is_active', 'is_seed', 'created_at'];
+        foreach (['disabled_at', 'updated_at'] as $optionalColumn) {
+            if ($this->hasUserColumn($optionalColumn)) {
+                $columns[] = $optionalColumn;
+            }
+        }
+
+        return implode(', ', $columns);
     }
 }

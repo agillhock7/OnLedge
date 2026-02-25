@@ -8,6 +8,9 @@ use PDO;
 
 final class Authz
 {
+    /** @var array<string, bool> */
+    private static array $userColumnCache = [];
+
     /** @return array<string, mixed> */
     public static function requireActiveUser(PDO $db, int $userId): array
     {
@@ -36,7 +39,12 @@ final class Authz
     {
         $columns = ['id', 'email', 'created_at'];
         if (Schema::hasAdminUserColumns($db)) {
-            $columns = [...$columns, 'role', 'is_active', 'is_seed', 'updated_at', 'disabled_at'];
+            $columns = [...$columns, 'role', 'is_active', 'is_seed'];
+            foreach (['updated_at', 'disabled_at'] as $optionalColumn) {
+                if (self::hasUserColumn($db, $optionalColumn)) {
+                    $columns[] = $optionalColumn;
+                }
+            }
         }
 
         $stmt = $db->prepare(
@@ -53,6 +61,19 @@ final class Authz
         }
 
         return self::normalizeUser($user);
+    }
+
+    private static function hasUserColumn(PDO $db, string $column): bool
+    {
+        $cacheKey = 'users:' . $column;
+        if (array_key_exists($cacheKey, self::$userColumnCache)) {
+            return self::$userColumnCache[$cacheKey];
+        }
+
+        $exists = Schema::hasColumn($db, 'users', $column);
+        self::$userColumnCache[$cacheKey] = $exists;
+
+        return $exists;
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */
