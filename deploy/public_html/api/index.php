@@ -179,10 +179,12 @@ try {
     $sqlState = (string) $exception->getCode();
     $rawMessage = strtolower($exception->getMessage());
     $safeError = null;
-    if (in_array($sqlState, ['42P01', '42703'], true)) {
-        $safeError = 'Database schema is outdated. Apply latest migrations (002 and 004).';
+    if (in_array($sqlState, ['42P01', '42703', '42883'], true)) {
+        $safeError = 'Database schema is outdated or missing helper functions. Apply latest migrations (002 and 004) and trigger functions.';
     } elseif ($sqlState === '42501') {
         $safeError = 'Database permission denied. Grant table and sequence privileges to the app user.';
+    } elseif ($sqlState === '23514') {
+        $safeError = 'Database constraint violation. Verify allowed values and schema constraints.';
     } elseif (str_starts_with($sqlState, '08')) {
         $safeError = 'Database connection failed. Check host, port, SSL mode, and reachability.';
     } elseif (str_contains($rawMessage, 'could not find driver')) {
@@ -196,9 +198,12 @@ try {
 
     $error = match ($sqlState) {
         '42P01' => 'Database schema is missing. Run migrations before using the API.',
+        '42703' => 'Database schema is outdated. Missing expected column(s). Apply latest migrations.',
+        '42883' => 'Database function is missing. Recreate trigger/helper functions and rerun migrations.',
         '3D000' => 'Database does not exist for configured credentials.',
         '28000', '28P01' => 'Database authentication failed. Check DB user/password.',
         '42501' => 'Database permission denied. Grant table and sequence privileges to the app user.',
+        '23514' => 'Database constraint violation. Verify role/status values and users constraints.',
         default => (str_starts_with($sqlState, '08')
             ? 'Database connection failed. Check host/port/SSL and reachability.'
             : 'Database error during request. Check server logs for details.'),
