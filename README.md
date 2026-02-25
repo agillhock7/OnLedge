@@ -35,6 +35,7 @@
 - [API Surface](#api-surface)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
+- [License](#license)
 - [Compatibility Notes](#compatibility-notes)
 
 ## Live Project
@@ -438,6 +439,10 @@ Recommended checks before pushing:
 npm --prefix frontend run typecheck
 npm run build
 ```
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 ## Compatibility Notes
 
