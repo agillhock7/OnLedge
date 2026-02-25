@@ -1,28 +1,15 @@
 <template>
-  <section class="page">
-    <h1>Capture Receipt</h1>
-    <p class="muted">
-      Use smart scan to isolate the receipt from background. For long receipts, capture multiple segments and stitch them into one image.
-    </p>
+  <section class="page capture-page">
+    <h1>Scan Receipt</h1>
+    <p class="muted">Capture a receipt, adjust edges, and upload.</p>
+
+    <ol class="capture-steps" aria-label="Receipt capture steps">
+      <li class="capture-step" :class="{ active: !previewUrl }">1. Capture</li>
+      <li class="capture-step" :class="{ active: !!previewUrl }">2. Adjust</li>
+      <li class="capture-step" :class="{ active: !!previewUrl }">3. Upload</li>
+    </ol>
 
     <div class="card camera-capture" style="margin-top: 1rem">
-      <div class="scan-mode-controls" role="group" aria-label="Capture options">
-        <label class="scan-toggle">
-          <input type="checkbox" v-model="smartScan" :disabled="submitting || previewUrl !== ''" />
-          Smart scan crop
-        </label>
-        <label class="scan-toggle">
-          <input type="checkbox" v-model="longReceiptMode" :disabled="submitting || previewUrl !== ''" @change="handleLongModeChange" />
-          Long receipt mode
-        </label>
-      </div>
-
-      <p class="muted scan-hint">
-        {{ longReceiptMode
-          ? 'Capture each section with a small overlap, then tap Finalize Scan.'
-          : 'Align receipt inside the guide frame, then tap Capture.' }}
-      </p>
-
       <div class="camera-stage">
         <video
           v-show="!previewUrl && cameraSupported"
@@ -34,14 +21,13 @@
         ></video>
 
         <div v-if="previewUrl" class="preview-editor">
-          <img ref="previewImageEl" :src="previewUrl" alt="Captured receipt preview" class="camera-feed" />
+          <img ref="previewImageEl" :src="previewUrl" alt="Receipt preview" class="camera-feed" />
 
-          <svg v-if="manualAdjust" class="edge-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <svg class="edge-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             <polygon :points="polygonPoints" />
           </svg>
 
           <button
-            v-if="manualAdjust"
             v-for="(_, index) in corners"
             :key="index"
             class="corner-handle"
@@ -61,76 +47,34 @@
             <span class="guide-corner bl"></span>
             <span class="guide-corner br"></span>
           </div>
-          <p class="camera-guide-copy">Fit receipt edges within the frame</p>
         </div>
 
         <div v-if="!cameraSupported" class="camera-placeholder">
-          Camera capture is not available in this browser. Use image upload fallback.
+          Camera capture is not available in this browser. Use photo upload instead.
         </div>
 
         <canvas ref="canvasEl" style="display: none"></canvas>
       </div>
 
-      <div v-if="previewUrl" class="inline" style="margin-top: 0.8rem">
-        <label class="scan-toggle">
-          <input type="checkbox" v-model="manualAdjust" :disabled="submitting" />
-          Manual edge adjust
-        </label>
-        <button
-          type="button"
-          class="ghost"
-          :disabled="submitting || processingCapture"
-          @click="applyAutoEdges"
-        >
-          Auto Detect Edges
-        </button>
-      </div>
-
-      <div v-if="longReceiptMode && !previewUrl && segmentPreviews.length > 0" class="segment-strip">
-        <div v-for="(segment, index) in segmentPreviews" :key="`${segment}-${index}`" class="segment-thumb">
-          <img :src="segment" :alt="`Receipt segment ${index + 1}`" />
-        </div>
-      </div>
-
-      <p v-if="longReceiptMode && !previewUrl && segmentPreviews.length > 0" class="muted segment-caption">
-        {{ segmentPreviews.length }} segment{{ segmentPreviews.length > 1 ? 's' : '' }} captured.
+      <p class="muted capture-hint">
+        {{ previewUrl
+          ? 'Drag each corner to match the receipt edges as tightly as possible.'
+          : 'Position the receipt inside the frame and tap Capture Receipt.' }}
       </p>
 
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="message" class="success">{{ message }}</p>
 
-      <div class="inline" style="margin-top: 1rem">
+      <div class="capture-actions" v-if="!previewUrl">
         <button
-          v-if="!previewUrl"
-          class="primary"
+          class="primary capture-primary"
           :disabled="starting || submitting || processingCapture || !cameraSupported || !stream"
           @click="capturePhoto"
         >
-          {{ captureButtonLabel }}
+          {{ starting ? 'Starting Camera...' : processingCapture ? 'Capturing...' : 'Capture Receipt' }}
         </button>
 
         <button
-          v-if="!previewUrl && longReceiptMode && segmentPreviews.length > 0"
-          type="button"
-          class="secondary"
-          :disabled="submitting || processingCapture"
-          @click="finalizeLongScan"
-        >
-          {{ processingCapture ? 'Finalizing...' : 'Finalize Scan' }}
-        </button>
-
-        <button
-          v-if="!previewUrl && longReceiptMode && segmentPreviews.length > 0"
-          type="button"
-          class="ghost"
-          :disabled="submitting || processingCapture"
-          @click="resetSegments"
-        >
-          Reset Segments
-        </button>
-
-        <button
-          v-if="!previewUrl"
           type="button"
           class="ghost"
           :disabled="starting || submitting || processingCapture || !cameraSupported"
@@ -139,36 +83,25 @@
           Switch Camera
         </button>
 
-        <button
-          v-if="previewUrl"
-          class="primary"
-          :disabled="submitting"
-          @click="uploadCapture"
-        >
-          {{ submitting ? 'Uploading...' : 'Upload Receipt' }}
-        </button>
-
-        <button
-          v-if="previewUrl"
-          type="button"
-          class="ghost"
-          :disabled="submitting"
-          @click="retake"
-        >
-          Retake
-        </button>
+        <label class="ghost capture-file-label" :class="{ disabled: submitting || processingCapture }">
+          Choose Photo
+          <input
+            class="capture-file-input"
+            type="file"
+            accept="image/jpeg,image/png"
+            capture="environment"
+            :disabled="submitting || processingCapture"
+            @change="onFallbackFile"
+          />
+        </label>
       </div>
 
-      <div style="margin-top: 1rem">
-        <label for="fallback-file">Image fallback</label>
-        <input
-          id="fallback-file"
-          type="file"
-          accept="image/jpeg,image/png"
-          capture="environment"
-          :disabled="submitting || processingCapture"
-          @change="onFallbackFile"
-        />
+      <div class="capture-actions" v-else>
+        <button type="button" class="ghost" :disabled="submitting || processingCapture" @click="retake">Retake</button>
+        <button type="button" class="ghost" :disabled="submitting || processingCapture" @click="applyAutoEdges">Auto Fit</button>
+        <button class="primary" :disabled="submitting || processingCapture" @click="uploadCapture">
+          {{ submitting ? 'Uploading...' : 'Upload Selected Area' }}
+        </button>
       </div>
     </div>
   </section>
@@ -182,8 +115,6 @@ import {
   correctReceiptPerspective,
   defaultReceiptCorners,
   type NormalizedCorner,
-  processCapturedFrame,
-  stitchReceiptSegments,
   suggestReceiptCorners
 } from '@/utils/receiptScan';
 
@@ -195,34 +126,23 @@ const canvasEl = ref<HTMLCanvasElement | null>(null);
 const stream = ref<MediaStream | null>(null);
 const capturedBlob = ref<Blob | null>(null);
 const previewUrl = ref('');
-const segmentPreviews = ref<string[]>([]);
-const segments = ref<Blob[]>([]);
 const starting = ref(false);
 const submitting = ref(false);
 const processingCapture = ref(false);
 const error = ref('');
 const message = ref('');
 const facingMode = ref<'environment' | 'user'>('environment');
-const smartScan = ref(true);
-const longReceiptMode = ref(false);
-const manualAdjust = ref(true);
 const corners = ref<NormalizedCorner[]>(defaultReceiptCorners());
 const activeHandleIndex = ref<number | null>(null);
 const cameraSupported = Boolean(navigator.mediaDevices?.getUserMedia);
 
-const captureButtonLabel = computed(() => {
-  if (starting.value) {
-    return 'Starting camera...';
-  }
-  if (processingCapture.value) {
-    return 'Processing...';
-  }
-  return longReceiptMode.value ? 'Capture Segment' : 'Capture';
-});
-
 const polygonPoints = computed(() =>
   corners.value.map((point) => `${(point.x * 100).toFixed(2)},${(point.y * 100).toFixed(2)}`).join(' ')
 );
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 
 function clearStatus(): void {
   error.value = '';
@@ -239,12 +159,6 @@ function clearPreview(): void {
 function setPreview(blob: Blob): void {
   clearPreview();
   previewUrl.value = URL.createObjectURL(blob);
-}
-
-function resetSegments(): void {
-  segmentPreviews.value.forEach((url) => URL.revokeObjectURL(url));
-  segmentPreviews.value = [];
-  segments.value = [];
 }
 
 function stopCamera(): void {
@@ -294,38 +208,6 @@ async function switchCamera(): Promise<void> {
   await startCamera();
 }
 
-function handleLongModeChange(): void {
-  if (!longReceiptMode.value) {
-    resetSegments();
-  }
-}
-
-function constrainCorners(points: NormalizedCorner[]): NormalizedCorner[] {
-  const next = points.map((point) => ({
-    x: clamp(point.x, 0, 1),
-    y: clamp(point.y, 0, 1)
-  }));
-
-  const minGap = 0.03;
-
-  next[0].x = Math.min(next[0].x, next[1].x - minGap, next[3].x - minGap);
-  next[0].y = Math.min(next[0].y, next[3].y - minGap, next[1].y - minGap);
-
-  next[1].x = Math.max(next[1].x, next[0].x + minGap, next[2].x - minGap);
-  next[1].y = Math.min(next[1].y, next[2].y - minGap, next[0].y + 0.3);
-
-  next[2].x = Math.max(next[2].x, next[3].x + minGap, next[1].x);
-  next[2].y = Math.max(next[2].y, next[1].y + minGap, next[3].y);
-
-  next[3].x = Math.min(next[3].x, next[2].x - minGap, next[0].x + 0.3);
-  next[3].y = Math.max(next[3].y, next[0].y + minGap, next[2].y);
-
-  return next.map((point) => ({
-    x: clamp(point.x, 0, 1),
-    y: clamp(point.y, 0, 1)
-  }));
-}
-
 function cornerStyle(index: number): Record<string, string> {
   const point = corners.value[index];
   return {
@@ -350,14 +232,10 @@ function updateCornerFromEvent(index: number, event: PointerEvent): void {
 
   const next = corners.value.map((point) => ({ ...point }));
   next[index] = { x, y };
-  corners.value = constrainCorners(next);
+  corners.value = next;
 }
 
 function startHandleDrag(index: number, event: PointerEvent): void {
-  if (!manualAdjust.value) {
-    return;
-  }
-
   activeHandleIndex.value = index;
   const target = event.currentTarget as HTMLElement | null;
   if (target && typeof target.setPointerCapture === 'function') {
@@ -397,11 +275,13 @@ async function applyAutoEdges(): Promise<void> {
   }
 
   processingCapture.value = true;
+  error.value = '';
+
   try {
     corners.value = await suggestReceiptCorners(capturedBlob.value);
-    message.value = 'Edges auto-detected. You can drag corners to refine.';
+    message.value = 'Edges refreshed. Drag corners if needed.';
   } catch {
-    error.value = 'Could not auto-detect edges for this image.';
+    error.value = 'Could not auto-fit edges for this image.';
   } finally {
     processingCapture.value = false;
   }
@@ -428,40 +308,20 @@ async function capturePhoto(): Promise<void> {
 
     context.drawImage(videoEl.value, 0, 0, width, height);
 
-    const blob = await processCapturedFrame(canvasEl.value, { smartScan: smartScan.value });
-
-    if (longReceiptMode.value) {
-      segments.value.push(blob);
-      segmentPreviews.value.push(URL.createObjectURL(blob));
-      message.value = `Segment ${segments.value.length} captured. Continue down the receipt, then tap Finalize Scan.`;
-      return;
-    }
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvasEl.value?.toBlob((result) => {
+        if (!result) {
+          reject(new Error('Unable to create capture image'));
+          return;
+        }
+        resolve(result);
+      }, 'image/jpeg', 0.94);
+    });
 
     await setCapturedPreview(blob);
     stopCamera();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Unable to create image capture';
-  } finally {
-    processingCapture.value = false;
-  }
-}
-
-async function finalizeLongScan(): Promise<void> {
-  if (segments.value.length === 0) {
-    error.value = 'Capture at least one segment before finalizing.';
-    return;
-  }
-
-  processingCapture.value = true;
-  error.value = '';
-
-  try {
-    const stitched = await stitchReceiptSegments(segments.value);
-    await setCapturedPreview(stitched);
-    stopCamera();
-    message.value = `Long receipt scan ready. ${segments.value.length} segment${segments.value.length > 1 ? 's' : ''} stitched.`;
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Unable to finalize long receipt scan';
+    error.value = err instanceof Error ? err.message : 'Unable to capture receipt';
   } finally {
     processingCapture.value = false;
   }
@@ -470,7 +330,6 @@ async function finalizeLongScan(): Promise<void> {
 async function retake(): Promise<void> {
   capturedBlob.value = null;
   clearPreview();
-  resetSegments();
   corners.value = defaultReceiptCorners();
   clearStatus();
   await startCamera();
@@ -485,14 +344,13 @@ async function onFallbackFile(event: Event): Promise<void> {
 
   clearStatus();
   stopCamera();
-
   await setCapturedPreview(file);
-  resetSegments();
+  target.value = '';
 }
 
 async function uploadCapture(): Promise<void> {
   if (!capturedBlob.value) {
-    error.value = 'Capture or select an image first.';
+    error.value = 'Capture or choose an image first.';
     return;
   }
 
@@ -500,12 +358,7 @@ async function uploadCapture(): Promise<void> {
   clearStatus();
 
   try {
-    let uploadBlob = capturedBlob.value;
-    if (manualAdjust.value) {
-      uploadBlob = await correctReceiptPerspective(uploadBlob, corners.value, {
-        enhance: smartScan.value
-      });
-    }
+    const uploadBlob = await correctReceiptPerspective(capturedBlob.value, corners.value, { enhance: true });
 
     const file = new File(
       [uploadBlob],
@@ -533,11 +386,10 @@ async function uploadCapture(): Promise<void> {
 
     capturedBlob.value = null;
     clearPreview();
-    resetSegments();
     corners.value = defaultReceiptCorners();
     await startCamera();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Unable to upload capture';
+    error.value = err instanceof Error ? err.message : 'Unable to upload receipt';
   } finally {
     submitting.value = false;
   }
@@ -556,10 +408,5 @@ onUnmounted(() => {
   window.removeEventListener('pointercancel', onGlobalPointerUp);
   stopCamera();
   clearPreview();
-  resetSegments();
 });
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 </script>

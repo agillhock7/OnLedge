@@ -492,34 +492,82 @@ button.ghost {
   max-width: 760px;
 }
 
-.scan-mode-controls {
+.capture-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0.85rem 0 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.7rem;
+  gap: 0.48rem;
 }
 
-.scan-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
+.capture-step {
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  padding: 0.44rem 0.72rem;
-  background: #f2f8f7;
-  color: #244a56;
-  font-size: 0.82rem;
+  padding: 0.34rem 0.68rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  margin: 0;
+  color: #476874;
+  background: #f3f8f7;
 }
 
-.scan-toggle input {
-  width: auto;
-  margin: 0;
+.capture-step.active {
+  background: #dff0ef;
+  border-color: #7caeb5;
+  color: #1a5463;
 }
 
-.scan-hint {
-  margin: 0.65rem 0 0.85rem;
-  font-size: 0.85rem;
+.capture-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.86rem;
+}
+
+.capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.62rem;
+  align-items: center;
+  margin-top: 0.95rem;
+}
+
+.capture-primary {
+  min-width: 170px;
+}
+
+.capture-file-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  min-height: 42px;
+  padding: 0.72rem 1rem;
+  border: 1px solid rgba(180, 201, 204, 0.75);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.capture-file-label:hover {
+  transform: translateY(-1px);
+}
+
+.capture-file-label.disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.capture-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  border: 0;
+  padding: 0;
+  clip: rect(0, 0, 0, 0);
+  overflow: hidden;
 }
 
 .camera-stage {
@@ -572,9 +620,9 @@ button.ghost {
 
 .corner-handle {
   position: absolute;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
   border-radius: 999px;
   border: 2px solid #d7f7ff;
   background: #11799a;
@@ -668,35 +716,6 @@ button.ghost {
   color: #d2dee3;
   padding: 1rem;
   text-align: center;
-}
-
-.segment-strip {
-  margin-top: 0.85rem;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(80px, 90px);
-  gap: 0.52rem;
-  overflow-x: auto;
-  padding-bottom: 0.35rem;
-}
-
-.segment-thumb {
-  border: 1px solid #cad9d6;
-  border-radius: 10px;
-  background: #eaf4f3;
-  overflow: hidden;
-  height: 116px;
-}
-
-.segment-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.segment-caption {
-  margin: 0.35rem 0 0;
-  font-size: 0.79rem;
 }
 
 .receipts-table-wrap {
@@ -931,23 +950,18 @@ button.ghost {
     grid-template-columns: 1fr;
   }
 
-  .scan-mode-controls {
+  .capture-actions {
     display: grid;
-    gap: 0.55rem;
+    gap: 0.58rem;
   }
 
-  .scan-toggle {
+  .capture-actions > * {
     width: 100%;
-    justify-content: flex-start;
-    min-height: 40px;
+    min-width: 0;
   }
 
   .camera-guide {
     width: 90%;
     height: 88%;
-  }
-
-  .segment-strip {
-    grid-auto-columns: minmax(78px, 86px);
   }
 }
