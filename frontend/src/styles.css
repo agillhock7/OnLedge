@@ -2402,6 +2402,35 @@ button.ghost {
   background: #fff;
 }
 
+.receipt-media-frame {
+  border: 1px solid #b9cecd;
+  border-radius: 16px;
+  background: #f6fbfa;
+  min-height: 320px;
+  max-height: 75vh;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.receipt-media-frame video {
+  width: 100%;
+  max-height: 75vh;
+  display: block;
+  background: #10181c;
+}
+
+.receipt-audio-shell {
+  border: 1px solid #b9cecd;
+  border-radius: 16px;
+  background: #f6fbfa;
+  padding: 1rem;
+}
+
+.receipt-audio-shell audio {
+  width: 100%;
+}
+
 .receipt-text-frame {
   border: 1px solid #b9cecd;
   border-radius: 16px;

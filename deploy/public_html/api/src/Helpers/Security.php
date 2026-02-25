@@ -19,6 +19,14 @@ final class Security
         header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
     }
 
+    public static function allowSameOriginFramePreview(): void
+    {
+        // Narrow override for controlled binary preview endpoints (same-origin only).
+        header('X-Frame-Options: SAMEORIGIN');
+        header("Content-Security-Policy: default-src 'none'; frame-ancestors 'self'; base-uri 'none'");
+        header('Cross-Origin-Resource-Policy: same-origin');
+    }
+
     public static function enforceMutatingRequestGuard(string $method): void
     {
         if (!in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {

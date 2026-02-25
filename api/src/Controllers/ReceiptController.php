@@ -10,6 +10,7 @@ use App\Helpers\Request;
 use App\Helpers\Response;
 use App\Helpers\RuleEngine;
 use App\Helpers\Schema;
+use App\Helpers\Security;
 use App\Services\ReceiptAiExtractor;
 use DateTimeImmutable;
 use PDO;
@@ -203,6 +204,7 @@ final class ReceiptController
         $fileSize = filesize($resolvedPath);
         $filename = basename($resolvedPath);
 
+        Security::allowSameOriginFramePreview();
         header('Content-Type: ' . $contentType);
         header('Content-Disposition: inline; filename="' . str_replace('"', '', $filename) . '"');
         header('X-Content-Type-Options: nosniff');

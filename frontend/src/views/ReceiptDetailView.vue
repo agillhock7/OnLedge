@@ -69,6 +69,27 @@
             </div>
           </template>
 
+          <template v-else-if="previewKind === 'video'">
+            <div class="receipt-media-frame">
+              <video :src="receiptImageUrl" controls preload="metadata" playsinline></video>
+            </div>
+          </template>
+
+          <template v-else-if="previewKind === 'audio'">
+            <div class="receipt-audio-shell">
+              <audio :src="receiptImageUrl" controls preload="metadata"></audio>
+            </div>
+          </template>
+
+          <template v-else-if="previewKind === 'embed'">
+            <div class="receipt-doc-frame">
+              <iframe :src="receiptImageUrl" title="Receipt document preview" loading="lazy"></iframe>
+            </div>
+            <p class="muted receipt-preview-note">
+              If your browser cannot render this format inline, use "Open File".
+            </p>
+          </template>
+
           <template v-else-if="previewKind === 'text'">
             <div class="receipt-text-frame">
               <pre class="receipt-text-preview">{{ textPreview }}</pre>
@@ -299,7 +320,7 @@ const processing = ref(false);
 const saving = ref(false);
 const editing = ref(false);
 const imageFailed = ref(false);
-const previewKind = ref<'none' | 'image' | 'pdf' | 'text' | 'unsupported'>('none');
+const previewKind = ref<'none' | 'image' | 'pdf' | 'video' | 'audio' | 'embed' | 'text' | 'unsupported'>('none');
 const previewLoading = ref(false);
 const previewNotice = ref('');
 const textPreview = ref('');
@@ -382,8 +403,11 @@ async function resolveAttachmentPreview(): Promise<void> {
   }
 
   const ext = attachmentExtension.value;
-  const imageExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']);
-  const textExtensions = new Set(['txt', 'csv', 'log']);
+  const imageExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg', 'tif', 'tiff']);
+  const textExtensions = new Set(['txt', 'csv', 'tsv', 'log', 'json', 'xml', 'md', 'yaml', 'yml']);
+  const videoExtensions = new Set(['mp4', 'webm', 'ogg', 'mov', 'm4v']);
+  const audioExtensions = new Set(['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg']);
+  const embedExtensions = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'rtf', 'odt', 'ods', 'odp']);
 
   if (imageExtensions.has(ext)) {
     previewKind.value = 'image';
@@ -392,6 +416,21 @@ async function resolveAttachmentPreview(): Promise<void> {
 
   if (ext === 'pdf') {
     previewKind.value = 'pdf';
+    return;
+  }
+
+  if (videoExtensions.has(ext)) {
+    previewKind.value = 'video';
+    return;
+  }
+
+  if (audioExtensions.has(ext)) {
+    previewKind.value = 'audio';
+    return;
+  }
+
+  if (embedExtensions.has(ext)) {
+    previewKind.value = 'embed';
     return;
   }
 
