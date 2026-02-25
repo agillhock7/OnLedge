@@ -11,10 +11,28 @@
 
     <div class="card camera-capture" style="margin-top: 1rem">
       <div v-if="!previewUrl" class="capture-launch">
-        <button class="primary capture-primary" :disabled="submitting || processingCapture" @click="openNativeCapture">
+        <label class="primary capture-primary capture-input-label" :class="{ disabled: submitting || processingCapture }">
           Capture Receipt
-        </button>
-        <p class="muted capture-launch-copy">This opens your device's native camera/photo picker.</p>
+          <input
+            class="capture-file-overlay"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            :disabled="submitting || processingCapture"
+            @change="onFileSelected"
+          />
+        </label>
+        <label class="ghost capture-input-label capture-secondary" :class="{ disabled: submitting || processingCapture }">
+          Choose Existing Photo
+          <input
+            class="capture-file-overlay"
+            type="file"
+            accept="image/*"
+            :disabled="submitting || processingCapture"
+            @change="onFileSelected"
+          />
+        </label>
+        <p class="muted capture-launch-copy">Camera opens directly on supported devices.</p>
       </div>
 
       <div v-else class="camera-stage is-preview">
@@ -58,14 +76,6 @@
         </button>
       </div>
 
-      <input
-        ref="fileInputEl"
-        class="capture-file-input"
-        type="file"
-        accept="image/*"
-        :disabled="submitting || processingCapture"
-        @change="onFileSelected"
-      />
     </div>
   </section>
 </template>
@@ -83,7 +93,6 @@ import {
 
 const receipts = useReceiptsStore();
 
-const fileInputEl = ref<HTMLInputElement | null>(null);
 const previewImageEl = ref<HTMLImageElement | null>(null);
 const capturedBlob = ref<Blob | null>(null);
 const previewUrl = ref('');
@@ -178,11 +187,6 @@ async function setCapturedPreview(blob: Blob): Promise<void> {
   } catch {
     corners.value = defaultReceiptCorners();
   }
-}
-
-function openNativeCapture(): void {
-  clearStatus();
-  fileInputEl.value?.click();
 }
 
 function clearSelection(): void {
