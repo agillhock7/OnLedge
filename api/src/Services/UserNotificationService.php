@@ -61,17 +61,17 @@ final class UserNotificationService
     }
 
     /** @param array<string, mixed> $user */
-    public function sendWelcomeEmailIfPending(array $user): void
+    public function sendWelcomeEmailIfPending(array $user): bool
     {
         $userId = (int) ($user['id'] ?? 0);
         $email = trim((string) ($user['email'] ?? ''));
         if ($userId <= 0 || $email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return;
+            return false;
         }
 
         $settings = $this->getPreferences($userId);
         if (trim((string) ($settings['welcome_email_sent_at'] ?? '')) !== '') {
-            return;
+            return false;
         }
 
         $sent = $this->mailer->send($email, 'welcome_user', [
@@ -81,21 +81,24 @@ final class UserNotificationService
 
         if ($sent) {
             $this->markWelcomeSent($userId);
+            return true;
         }
+
+        return false;
     }
 
     /** @param array<string, mixed> $user */
-    public function sendWeeklyDigestIfDue(array $user): void
+    public function sendWeeklyDigestIfDue(array $user): bool
     {
         $userId = (int) ($user['id'] ?? 0);
         $email = trim((string) ($user['email'] ?? ''));
         if ($userId <= 0 || $email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return;
+            return false;
         }
 
         $settings = $this->getPreferences($userId);
         if (!$this->toBool($settings['weekly_report_enabled'] ?? true)) {
-            return;
+            return false;
         }
 
         $lastSent = trim((string) ($settings['weekly_report_last_sent_at'] ?? ''));
@@ -104,7 +107,7 @@ final class UserNotificationService
                 $last = new DateTimeImmutable($lastSent);
                 $next = $last->add(new DateInterval('P7D'));
                 if ($next > new DateTimeImmutable('now')) {
-                    return;
+                    return false;
                 }
             } catch (\Throwable) {
                 // ignore invalid stored timestamp; continue
@@ -120,7 +123,10 @@ final class UserNotificationService
 
         if ($sent) {
             $this->markWeeklyReportSent($userId);
+            return true;
         }
+
+        return false;
     }
 
     /** @return array<string, mixed> */
@@ -321,4 +327,3 @@ final class UserNotificationService
         return rtrim((string) ($app['url'] ?? ''), '/');
     }
 }
-

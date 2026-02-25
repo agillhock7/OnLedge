@@ -28,6 +28,7 @@
 - [Admin Bootstrap](#admin-bootstrap)
 - [Build And Release Workflow](#build-and-release-workflow)
 - [cPanel Deployment Runbook](#cpanel-deployment-runbook)
+- [Cron Jobs](#cron-jobs)
 - [Public Repo Guardrails](#public-repo-guardrails)
 - [Security Baseline](#security-baseline)
 - [Branding And Social Metadata](#branding-and-social-metadata)
@@ -280,6 +281,21 @@ Release sequence:
 5. Trigger cPanel deployment (or use auto-deploy)
 
 `.cpanel.yml` handles folder creation + file copy from `deploy/public_html`.
+
+## Cron Jobs
+
+To send weekly spending reports on schedule (instead of waiting for user login activity), configure a cPanel cron job:
+
+```bash
+/usr/bin/php /home/gopsapp1/repositories/OnLedge/scripts/run-weekly-report-cron.php >> /home/gopsapp1/logs/onledge-weekly-cron.log 2>&1
+```
+
+Recommended schedule:
+
+- Weekly: Monday at `08:00` server time, or
+- Daily: every morning (script self-limits to max once every 7 days per user).
+
+The script uses a lock file (`/tmp/onledge-weekly-report-cron.lock`) to prevent overlapping runs.
 
 ## Public Repo Guardrails
 
