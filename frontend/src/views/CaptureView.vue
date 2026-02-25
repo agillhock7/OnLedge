@@ -1,7 +1,7 @@
 <template>
   <section class="page">
     <h1>Capture Receipt</h1>
-    <p class="muted">Point camera, tap capture, and upload. OnLedge handles processing after upload.</p>
+    <p class="muted">Point camera, tap capture, and upload. OnLedge will auto-run AI extraction after upload.</p>
 
     <div class="card camera-capture" style="margin-top: 1rem">
       <div class="camera-stage">
@@ -237,12 +237,12 @@ async function uploadCapture(): Promise<void> {
 
     if (navigator.onLine && !created.offline) {
       await receipts.processReceipt(created.id).catch(() => {
-        // Processing is best-effort; upload should still succeed.
+        // AI extraction is best-effort; upload should still succeed.
       });
     }
 
     message.value = navigator.onLine
-      ? 'Receipt uploaded. Processing queued.'
+      ? 'Receipt uploaded. AI extraction started.'
       : 'Receipt saved offline. It will sync when you reconnect.';
 
     capturedBlob.value = null;

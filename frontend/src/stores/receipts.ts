@@ -6,13 +6,31 @@ import { clearLocalReceipts, enqueue, getLocalReceipts, listQueue, putLocalRecei
 export type Receipt = {
   id: string;
   merchant?: string;
+  merchant_address?: string;
+  receipt_number?: string;
   total?: number;
   currency?: string;
   purchased_at?: string;
+  purchased_time?: string;
+  subtotal?: number;
+  tax?: number;
+  tip?: number;
   notes?: string;
   raw_text?: string;
   category?: string;
   tags?: string[];
+  line_items?: Array<{
+    name: string;
+    quantity?: number | null;
+    unit_price?: number | null;
+    total_price?: number | null;
+    category?: string | null;
+  }>;
+  payment_method?: string;
+  payment_last4?: string;
+  ai_confidence?: number;
+  ai_model?: string;
+  processed_at?: string;
   file_path?: string;
   processing_explanation?: unknown[];
   created_at?: string;

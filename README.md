@@ -44,6 +44,7 @@
 
 - Capture receipts directly from camera
 - Queue and sync intelligently with offline-aware frontend behavior
+- Extract vendor, totals, dates, OCR text, and line items with AI processing
 - Store records in PostgreSQL with full-text search support
 - Apply explainable rules during processing
 - Export receipts to CSV for reporting/accounting workflows
@@ -98,6 +99,10 @@ Hard rule: the server should never need `npm`, `vite`, or Node build steps.
       (config.php is local/server only, never committed)
     /migrations
       001_init.sql
+      002_admin_support.sql
+      003_seed_owner.example.sql
+      004_oauth_identities.sql
+      005_receipt_ai_fields.sql
     /public
       index.php
     /src
@@ -154,9 +159,25 @@ Required production settings in `api/config/config.php`:
 - DB connection (`host`, `port`, `dbname`, `user`, `password`, `sslmode`)
 - upload constraints (`uploads.dir`, `max_upload_mb`, `allowed_mime_types`)
 - secure session cookies (`secure`, `httponly`, `samesite`)
+- optional AI extraction provider (`ai.enabled`, `ai.openai.*`)
 - optional OAuth providers (`oauth.github.*`, `oauth.discord.*`)
 
 Reference key map: `api/.env.example`
+
+Enable AI extraction in `api/config/config.php`:
+
+```php
+'ai' => [
+  'enabled' => true,
+  'provider' => 'openai',
+  'openai' => [
+    'api_key' => 'sk-...',
+    'model' => 'gpt-4o-mini',
+    'base_url' => 'https://api.openai.com/v1',
+    'timeout_seconds' => 45,
+  ],
+],
+```
 
 ## Database Setup
 
@@ -166,6 +187,7 @@ Run migrations in order:
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/001_init.sql
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/002_admin_support.sql
 psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/004_oauth_identities.sql
+psql "host=<HOST> port=<PORT> dbname=<DB> user=<USER> sslmode=<SSLMODE>" -f api/migrations/005_receipt_ai_fields.sql
 ```
 
 If using pgAdmin query window, paste file contents directly.
@@ -179,6 +201,7 @@ Migration includes:
 - extension-free UUID generation (`onledge_uuid_v4`) for shared hosts without `pgcrypto`
 - role-based users (`user`, `admin`, `owner`) and support ticket tables
 - OAuth identity linking table (`oauth_identities`) for GitHub/Discord login
+- AI extraction fields for merchant metadata, payment details, and `line_items`
 
 ## Admin Bootstrap
 
@@ -303,6 +326,7 @@ Receipts:
 - `PUT /api/receipts/{id}`
 - `DELETE /api/receipts/{id}`
 - `POST /api/receipts/{id}/process`
+  - Runs AI extraction (when configured), then rule engine, and stores explainability details.
 
 Rules / Search / Export:
 

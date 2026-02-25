@@ -42,6 +42,16 @@ return [
         'from_email' => 'noreply@example.com',
         'from_name' => 'OnLedge',
     ],
+    'ai' => [
+        'enabled' => false,
+        'provider' => 'openai',
+        'openai' => [
+            'api_key' => '',
+            'model' => 'gpt-4o-mini',
+            'base_url' => 'https://api.openai.com/v1',
+            'timeout_seconds' => 45,
+        ],
+    ],
     'oauth' => [
         'github' => [
             'enabled' => false,
