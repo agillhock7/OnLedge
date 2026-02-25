@@ -1,6 +1,17 @@
 -- OnLedge initial schema (PostgreSQL)
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Shared hosting may not allow pgcrypto/uuid-ossp extensions.
+-- Use a local UUIDv4-like generator that does not require extensions.
+CREATE OR REPLACE FUNCTION onledge_uuid_v4() RETURNS UUID AS $$
+SELECT (
+  substr(md5(random()::text || clock_timestamp()::text), 1, 8) || '-' ||
+  substr(md5(random()::text || clock_timestamp()::text), 9, 4) || '-4' ||
+  substr(md5(random()::text || clock_timestamp()::text), 14, 3) || '-' ||
+  substr('89ab', (floor(random() * 4)::int + 1), 1) ||
+  substr(md5(random()::text || clock_timestamp()::text), 18, 3) || '-' ||
+  substr(md5(random()::text || clock_timestamp()::text), 21, 12)
+)::uuid;
+$$ LANGUAGE SQL VOLATILE;
 
 CREATE TABLE IF NOT EXISTS users (
   id BIGSERIAL PRIMARY KEY,
@@ -19,7 +30,7 @@ CREATE TABLE IF NOT EXISTS password_resets (
 );
 
 CREATE TABLE IF NOT EXISTS receipts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT onledge_uuid_v4(),
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   merchant TEXT,
   total NUMERIC(12,2),

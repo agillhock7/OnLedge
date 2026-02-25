@@ -120,6 +120,7 @@ What migration creates:
 - `users`, `password_resets`, `receipts`, `rules`
 - `tsvector` search column + GIN index + trigger for full-text search
 - `updated_at` triggers
+- extension-free UUID generator (`onledge_uuid_v4()`) for shared hosts without `pgcrypto`
 
 cPanel note:
 
